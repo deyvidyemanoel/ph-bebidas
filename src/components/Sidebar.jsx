@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Package, ShoppingCart, BarChart2, Users, Settings, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X } from 'lucide-react';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Início', icon: LayoutDashboard },
@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { id: 'clientes', label: 'Clientes', icon: Users },
 ];
 
-export default function Sidebar({ activeTab, onTabChange, isOpen, onToggle }) {
+export default function Sidebar({ activeTab, onTabChange, isOpen, onToggle, onLogout }) {
   return (
     <>
       {isOpen && (
@@ -62,7 +62,7 @@ export default function Sidebar({ activeTab, onTabChange, isOpen, onToggle }) {
           ))}
         </nav>
 
-        <div className="px-4 pb-4 border-t border-dark-400 pt-3">
+        <div className="px-4 pb-4 border-t border-dark-400 pt-3 space-y-1">
           <button
             onClick={() => { onTabChange('configuracoes'); if (window.innerWidth < 1024) onToggle(); }}
             className={`
@@ -77,6 +77,14 @@ export default function Sidebar({ activeTab, onTabChange, isOpen, onToggle }) {
             {activeTab === 'configuracoes' && (
               <div className="ml-auto w-1.5 h-1.5 rounded-full bg-gold-400" />
             )}
+          </button>
+
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 text-gray-600 hover:text-red-400 hover:bg-red-400/8 border border-transparent"
+          >
+            <LogOut size={19} />
+            <span className="font-medium">Sair</span>
           </button>
         </div>
       </div>

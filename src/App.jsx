@@ -7,12 +7,18 @@ import PDV from './components/PDV';
 import Reports from './components/Reports';
 import Clients from './components/Clients';
 import Settings from './components/Settings';
+import Login from './components/Login';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { INITIAL_PRODUCTS } from './utils/helpers';
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useLocalStorage('ph_auth', false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  if (!isLoggedIn) {
+    return <Login onLogin={() => setIsLoggedIn(true)} />;
+  }
 
   const [products, setProducts] = useLocalStorage('ph_products', INITIAL_PRODUCTS);
   const [sales, setSales] = useLocalStorage('ph_sales', []);
@@ -85,6 +91,7 @@ export default function App() {
         onTabChange={setActiveTab}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(o => !o)}
+        onLogout={() => setIsLoggedIn(false)}
       />
 
       <div className="flex-1 lg:ml-64 flex flex-col min-w-0 overflow-hidden">
