@@ -12,18 +12,18 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { INITIAL_PRODUCTS } from './utils/helpers';
 
 export default function App() {
+  // Todos os hooks devem ser chamados antes de qualquer return condicional
   const [isLoggedIn, setIsLoggedIn] = useLocalStorage('ph_auth', false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />;
-  }
-
   const [products, setProducts] = useLocalStorage('ph_products', INITIAL_PRODUCTS);
   const [sales, setSales] = useLocalStorage('ph_sales', []);
   const [clients, setClients] = useLocalStorage('ph_clients', []);
   const [movements, setMovements] = useLocalStorage('ph_movements', []);
+
+  if (!isLoggedIn) {
+    return <Login onLogin={() => setIsLoggedIn(true)} />;
+  }
 
   const tabLabels = {
     dashboard: 'Início',
