@@ -8,25 +8,19 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
-    setTimeout(() => {
-      if (username === CREDENTIALS.user && password === CREDENTIALS.pass) {
-        onLogin();
-      } else {
-        setError('Usuário ou senha incorretos.');
-        setLoading(false);
-      }
-    }, 600);
+    if (username === CREDENTIALS.user && password === CREDENTIALS.pass) {
+      onLogin(); // síncrono — React atualiza o estado no mesmo ciclo de evento
+    } else {
+      setError('Usuário ou senha incorretos.');
+    }
   };
 
-  const ic = `w-full bg-dark-600 border rounded-xl px-4 py-3 text-white placeholder-gray-600
-    focus:outline-none transition-colors text-sm ${error ? 'border-red-500/50' : 'border-dark-300 focus:border-gold-500'}`;
+  const ic = `w-full bg-dark-600 border rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none transition-colors text-sm ${error ? 'border-red-500/50' : 'border-dark-300 focus:border-gold-500'}`;
 
   return (
     <div className="min-h-screen bg-dark-800 flex items-center justify-center p-4">
@@ -99,23 +93,11 @@ export default function Login({ onLogin }) {
 
             <button
               type="submit"
-              disabled={loading || !username || !password}
+              disabled={!username || !password}
               className="w-full py-3.5 bg-gold-500 text-black font-black text-base rounded-xl hover:bg-gold-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
             >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-                  </svg>
-                  Entrando...
-                </span>
-              ) : (
-                <>
-                  <LogIn size={18} />
-                  Entrar
-                </>
-              )}
+              <LogIn size={18} />
+              Entrar
             </button>
           </form>
         </div>
