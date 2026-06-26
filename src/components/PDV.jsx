@@ -13,82 +13,91 @@ function Receipt({ sale, clients, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-xs shadow-2xl">
-        <div id="receipt-print" className="p-6 font-mono text-black text-sm">
-          <div className="text-center mb-4">
-            <div className="text-5xl font-black tracking-tighter leading-none mb-1">PH</div>
-            <div className="font-bold text-base">PH BEBIDAS</div>
-            <div className="text-xs text-gray-500 mt-1">São Miguel do Tapuio - PI</div>
-            <div className="text-xs text-gray-400 mt-0.5">WhatsApp: (86) 98195-5717</div>
+        <div id="receipt-print" className="p-5 font-mono text-black text-xs">
+          {/* Cabeçalho */}
+          <div className="text-center mb-3">
+            <div className="text-4xl font-black tracking-tighter leading-none mb-1">PH</div>
+            <div className="font-bold text-sm">PH BEBIDAS</div>
+            <div className="text-gray-500 mt-0.5">São Miguel do Tapuio - PI</div>
+            <div className="text-gray-400 mt-0.5">WhatsApp: (86) 98195-5717</div>
           </div>
-          <div className="border-t-2 border-dashed border-gray-300 my-3" />
-          <div className="text-center text-xs text-gray-500 mb-1">
+
+          <div className="border-t-2 border-dashed border-gray-300 my-2" />
+
+          <div className="text-center text-gray-500 mb-1">
             {sale.status === 'pendente' ? '*** VENDA FIADO — PENDENTE ***' : '*** CUPOM NÃO FISCAL ***'}
           </div>
-          <div className="text-xs text-gray-500 text-center">{new Date(sale.date).toLocaleString('pt-BR')}</div>
-          {client && <div className="text-xs text-center mt-1 font-bold">Cliente: {client.name}</div>}
-          <div className="border-t-2 border-dashed border-gray-300 my-3" />
+          <div className="text-gray-500 text-center">{new Date(sale.date).toLocaleString('pt-BR')}</div>
+          {client && <div className="text-center mt-1 font-bold">Cliente: {client.name}</div>}
+
+          <div className="border-t-2 border-dashed border-gray-300 my-2" />
+
+          {/* Itens */}
           <div className="space-y-1.5">
             {sale.items.map((item, i) => (
               <div key={i}>
-                <div className="font-medium text-xs leading-tight">{item.name}</div>
-                <div className="flex justify-between text-xs text-gray-600">
+                <div className="font-medium leading-tight">{item.name}</div>
+                <div className="flex justify-between text-gray-600">
                   <span>{item.quantity}x {formatCurrency(item.unitPrice)}</span>
                   <span className="font-semibold">{formatCurrency(item.subtotal)}</span>
                 </div>
               </div>
             ))}
           </div>
-          <div className="border-t-2 border-dashed border-gray-300 my-3" />
+
+          <div className="border-t-2 border-dashed border-gray-300 my-2" />
+
+          {/* Total */}
           <div className="space-y-1">
-            <div className="flex justify-between font-black text-base">
+            <div className="flex justify-between font-black text-sm">
               <span>TOTAL</span>
               <span>{formatCurrency(sale.total)}</span>
             </div>
-            <div className="flex justify-between text-xs text-gray-600">
+            <div className="flex justify-between text-gray-600">
               <span>{getPaymentLabel(sale.paymentMethod)}</span>
               {sale.paymentMethod === 'dinheiro' && <span>Pago: {formatCurrency(sale.amountPaid)}</span>}
             </div>
             {sale.paymentMethod === 'dinheiro' && sale.change > 0 && (
-              <div className="flex justify-between text-sm font-bold">
+              <div className="flex justify-between font-bold">
                 <span>TROCO</span>
                 <span>{formatCurrency(sale.change)}</span>
               </div>
             )}
             {sale.status === 'pendente' && (
-              <div className="mt-2 p-2 border-2 border-gray-400 rounded text-center text-xs font-bold">
+              <div className="mt-2 p-2 border-2 border-gray-400 rounded text-center font-bold">
                 PENDENTE — A RECEBER
               </div>
             )}
           </div>
-          <div className="border-t-2 border-dashed border-gray-300 my-3" />
 
-          {/* Contact & payment info */}
-          <div className="space-y-1.5 text-xs">
-            <p className="text-gray-500 font-semibold uppercase tracking-wide text-center" style={{ fontSize: 9 }}>
+          <div className="border-t-2 border-dashed border-gray-300 my-2" />
+
+          {/* Contato e pagamento */}
+          <div className="text-center space-y-1.5">
+            <p className="text-gray-500 font-semibold uppercase tracking-wide" style={{ fontSize: '9px' }}>
               Contato &amp; Pagamento
             </p>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500 flex items-center gap-1">
-                <span style={{ fontSize: 11 }}>📱</span> WhatsApp
-              </span>
-              <span className="font-bold text-black">(86) 98195-5717</span>
+            <div>
+              <div className="text-gray-500">📱 WhatsApp</div>
+              <div className="font-bold">(86) 98195-5717</div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500 flex items-center gap-1">
-                <span style={{ fontSize: 11 }}>💳</span> Pix CPF
-              </span>
-              <span className="font-bold text-black">049.836.913-75</span>
+            <div>
+              <div className="text-gray-500">💳 Pix CPF</div>
+              <div className="font-bold">049.836.913-75</div>
             </div>
           </div>
 
-          <div className="border-t-2 border-dashed border-gray-300 my-3" />
-          <div className="text-center text-xs text-gray-500 space-y-0.5">
-            <p className="font-medium">Obrigado pela preferência!</p>
+          <div className="border-t-2 border-dashed border-gray-300 my-2" />
+
+          {/* Rodapé */}
+          <div className="text-center text-gray-500 space-y-0.5">
+            <p className="font-medium text-black">Obrigado pela preferência!</p>
             <p>Volte sempre!</p>
-            <p className="mt-1 text-gray-400">#{sale.id.slice(-8).toUpperCase()}</p>
+            <p className="mt-1 text-gray-400" style={{ fontSize: '9px' }}>#{sale.id.slice(-8).toUpperCase()}</p>
           </div>
         </div>
-        <div className="px-4 pb-4 flex gap-2">
+
+        <div className="px-4 pb-4 flex gap-2 print:hidden">
           <button onClick={handlePrint} className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white py-2.5 rounded-xl font-medium text-sm">
             <Printer size={16} /> Imprimir
           </button>

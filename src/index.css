@@ -32,6 +32,10 @@ body {
 }
 
 @media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
   body * {
     visibility: hidden;
   }
@@ -43,8 +47,11 @@ body {
     left: 0;
     top: 0;
     width: 80mm;
-    background: white;
-    color: black;
-    padding: 10mm;
+    box-sizing: border-box;
+    padding: 5mm 4mm !important;
+    background: white !important;
+    color: black !important;
+    font-size: 10px !important;
+    line-height: 1.4;
   }
 }
