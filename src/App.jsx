@@ -66,7 +66,7 @@ export default function App() {
           />
         );
       case 'relatorios':
-        return <Reports products={products} sales={sales} />;
+        return <Reports products={products} sales={sales} setSales={setSales} />;
       case 'clientes':
         return <Clients clients={clients} setClients={setClients} sales={sales} setSales={setSales} />;
       case 'configuracoes':

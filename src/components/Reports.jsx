@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import {
   TrendingUp, DollarSign, ShoppingBag, BarChart2,
-  Award, CreditCard, Calendar, Clock, ChevronDown, ChevronUp
+  Award, CreditCard, Calendar, Clock, ChevronDown, ChevronUp, Trash2
 } from 'lucide-react';
 import {
   formatCurrency, formatDateTime, isToday,
   isThisWeek, isThisMonth, getPaymentLabel
 } from '../utils/helpers';
 
-function SaleRow({ sale, products }) {
+function SaleRow({ sale, products, onDeleteRequest }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = sale.status === 'pendente';
 
@@ -45,10 +45,19 @@ function SaleRow({ sale, products }) {
         <td className="px-5 py-3 text-right text-emerald-400 text-sm hidden lg:table-cell">
           {isPending ? <span className="text-gray-600">—</span> : formatCurrency(saleProfit)}
         </td>
-        <td className="px-5 py-3 text-center">
-          <span className="text-gray-500">
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </span>
+        <td className="px-3 py-3">
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={e => { e.stopPropagation(); onDeleteRequest(sale); }}
+              className="text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors p-1.5 rounded-lg"
+              title="Apagar venda"
+            >
+              <Trash2 size={13} />
+            </button>
+            <span className="text-gray-500">
+              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </span>
+          </div>
         </td>
       </tr>
 
@@ -76,8 +85,9 @@ function SaleRow({ sale, products }) {
   );
 }
 
-export default function Reports({ products, sales }) {
+export default function Reports({ products, sales, setSales }) {
   const [period, setPeriod] = useState('today');
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const filterSales = () => {
     switch (period) {
@@ -288,12 +298,12 @@ export default function Reports({ products, sales }) {
                   <th className="text-left text-gray-600 text-xs px-5 py-3 font-medium uppercase tracking-wide hidden md:table-cell">Pagamento</th>
                   <th className="text-right text-gray-600 text-xs px-5 py-3 font-medium uppercase tracking-wide">Total</th>
                   <th className="text-right text-gray-600 text-xs px-5 py-3 font-medium uppercase tracking-wide hidden lg:table-cell">Lucro</th>
-                  <th className="w-8" />
+                  <th className="w-20" />
                 </tr>
               </thead>
               <tbody>
                 {sortedSales.map(sale => (
-                  <SaleRow key={sale.id} sale={sale} products={products} />
+                  <SaleRow key={sale.id} sale={sale} products={products} onDeleteRequest={setDeleteTarget} />
                 ))}
               </tbody>
               <tfoot>
@@ -314,6 +324,44 @@ export default function Reports({ products, sales }) {
           </div>
         )}
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-700 border border-dark-400 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                <Trash2 size={18} className="text-red-400" />
+              </div>
+              <div>
+                <p className="text-white font-semibold">Apagar venda</p>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  {formatDateTime(deleteTarget.date)} · {formatCurrency(deleteTarget.total)}
+                </p>
+              </div>
+            </div>
+            <p className="text-gray-400 text-sm mb-5">
+              Deseja apagar esta venda? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 rounded-xl border border-dark-300 text-gray-400 hover:text-white hover:border-dark-200 transition-colors text-sm font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setSales(prev => prev.filter(s => s.id !== deleteTarget.id));
+                  setDeleteTarget(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-400 transition-colors text-sm font-bold"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
