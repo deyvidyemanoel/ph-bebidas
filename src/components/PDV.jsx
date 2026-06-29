@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search, ShoppingCart, Trash2, Plus, Minus, X,
   Check, Printer, CreditCard, Banknote, Smartphone,
@@ -6,107 +7,217 @@ import {
 } from 'lucide-react';
 import { generateId, formatCurrency, PAYMENT_METHODS, getPaymentLabel } from '../utils/helpers';
 
+// Estilos inline para garantir impressão correta independente de Tailwind
+const rs = {
+  center: { textAlign: 'center' },
+  row: { display: 'flex', justifyContent: 'space-between', width: '100%' },
+  divider: { borderTop: '1px dashed #000', margin: '5px 0' },
+  bold: { fontWeight: '700' },
+  xbold: { fontWeight: '900' },
+  gray: { color: '#555' },
+  small: { fontSize: '10px' },
+  big: { fontSize: '14px' },
+  logo: { fontSize: '28px', fontWeight: '900', letterSpacing: '-1px', lineHeight: '1' },
+  mb1: { marginBottom: '3px' },
+  mb2: { marginBottom: '6px' },
+  mt1: { marginTop: '3px' },
+  mt2: { marginTop: '6px' },
+};
+
+function PrintReceipt({ sale, client }) {
+  const isFiado = sale.status === 'pendente';
+  return (
+    <div id="receipt-print">
+      {/* Cabeçalho */}
+      <div style={{ ...rs.center, ...rs.mb2 }}>
+        <div style={rs.logo}>PH</div>
+        <div style={{ ...rs.bold, ...rs.big }}>PH BEBIDAS</div>
+        <div style={{ ...rs.gray, ...rs.small, ...rs.mt1 }}>Sao Miguel do Tapuio - PI</div>
+        <div style={{ ...rs.gray, ...rs.small }}>WhatsApp: (86) 98195-5717</div>
+      </div>
+
+      <div style={rs.divider} />
+
+      <div style={{ ...rs.center, ...rs.gray, ...rs.mb1 }}>
+        {isFiado ? '*** VENDA FIADO - PENDENTE ***' : '*** CUPOM NAO FISCAL ***'}
+      </div>
+      <div style={{ ...rs.center, ...rs.gray, ...rs.mb1 }}>
+        {new Date(sale.date).toLocaleString('pt-BR')}
+      </div>
+      {client && (
+        <div style={{ ...rs.center, ...rs.bold, ...rs.mb1 }}>Cliente: {client.name}</div>
+      )}
+
+      <div style={rs.divider} />
+
+      {/* Itens */}
+      {sale.items.map((item, i) => (
+        <div key={i} style={rs.mb1}>
+          <div style={rs.bold}>{item.name}</div>
+          <div style={rs.row}>
+            <span style={rs.gray}>{item.quantity}x {formatCurrency(item.unitPrice)}</span>
+            <span style={rs.bold}>{formatCurrency(item.subtotal)}</span>
+          </div>
+        </div>
+      ))}
+
+      <div style={rs.divider} />
+
+      {/* Totais */}
+      <div style={{ ...rs.row, ...rs.xbold, ...rs.big }}>
+        <span>TOTAL</span>
+        <span>{formatCurrency(sale.total)}</span>
+      </div>
+      <div style={{ ...rs.row, ...rs.gray, ...rs.mt1 }}>
+        <span>{getPaymentLabel(sale.paymentMethod)}</span>
+        {sale.paymentMethod === 'dinheiro' && (
+          <span>Pago: {formatCurrency(sale.amountPaid)}</span>
+        )}
+      </div>
+      {sale.paymentMethod === 'dinheiro' && sale.change > 0 && (
+        <div style={{ ...rs.row, ...rs.bold, ...rs.mt1 }}>
+          <span>TROCO</span>
+          <span>{formatCurrency(sale.change)}</span>
+        </div>
+      )}
+      {isFiado && (
+        <div style={{ border: '2px solid #000', padding: '4px', textAlign: 'center', fontWeight: '700', marginTop: '6px' }}>
+          PENDENTE - A RECEBER
+        </div>
+      )}
+
+      <div style={rs.divider} />
+
+      {/* Contato */}
+      <div style={{ ...rs.center, ...rs.mb2 }}>
+        <div style={{ ...rs.gray, ...rs.small, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+          Contato &amp; Pagamento
+        </div>
+        <div style={rs.mb1}>
+          <div style={{ ...rs.gray, ...rs.small }}>WhatsApp</div>
+          <div style={rs.bold}>(86) 98195-5717</div>
+        </div>
+        <div>
+          <div style={{ ...rs.gray, ...rs.small }}>Pix CPF</div>
+          <div style={rs.bold}>049.836.913-75</div>
+        </div>
+      </div>
+
+      <div style={rs.divider} />
+
+      {/* Rodapé */}
+      <div style={rs.center}>
+        <div style={rs.bold}>Obrigado pela preferencia!</div>
+        <div style={rs.gray}>Volte sempre!</div>
+        <div style={{ ...rs.gray, ...rs.small, ...rs.mt1 }}>
+          #{sale.id.slice(-8).toUpperCase()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Receipt({ sale, clients, onClose }) {
   const client = clients.find(c => c.id === sale.customerId);
-  const handlePrint = () => window.print();
+  const isFiado = sale.status === 'pendente';
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-xs shadow-2xl">
-        <div id="receipt-print" className="p-5 font-mono text-black text-xs">
-          {/* Cabeçalho */}
-          <div className="text-center mb-3">
-            <div className="text-4xl font-black tracking-tighter leading-none mb-1">PH</div>
-            <div className="font-bold text-sm">PH BEBIDAS</div>
-            <div className="text-gray-500 mt-0.5">São Miguel do Tapuio - PI</div>
-            <div className="text-gray-400 mt-0.5">WhatsApp: (86) 98195-5717</div>
-          </div>
+    <>
+      {/* Conteúdo de impressão injetado direto no body via portal */}
+      {createPortal(<PrintReceipt sale={sale} client={client} />, document.body)}
 
-          <div className="border-t-2 border-dashed border-gray-300 my-2" />
-
-          <div className="text-center text-gray-500 mb-1">
-            {sale.status === 'pendente' ? '*** VENDA FIADO — PENDENTE ***' : '*** CUPOM NÃO FISCAL ***'}
-          </div>
-          <div className="text-gray-500 text-center">{new Date(sale.date).toLocaleString('pt-BR')}</div>
-          {client && <div className="text-center mt-1 font-bold">Cliente: {client.name}</div>}
-
-          <div className="border-t-2 border-dashed border-gray-300 my-2" />
-
-          {/* Itens */}
-          <div className="space-y-1.5">
-            {sale.items.map((item, i) => (
-              <div key={i}>
-                <div className="font-medium leading-tight">{item.name}</div>
-                <div className="flex justify-between text-gray-600">
-                  <span>{item.quantity}x {formatCurrency(item.unitPrice)}</span>
-                  <span className="font-semibold">{formatCurrency(item.subtotal)}</span>
+      {/* Modal de prévia na tela */}
+      <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-xs shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="overflow-y-auto flex-1 p-5 font-mono text-black text-xs">
+            {/* Cabeçalho */}
+            <div className="text-center mb-3">
+              <div className="text-4xl font-black tracking-tighter leading-none mb-1">PH</div>
+              <div className="font-bold text-sm">PH BEBIDAS</div>
+              <div className="text-gray-500 mt-0.5">São Miguel do Tapuio - PI</div>
+              <div className="text-gray-500 mt-0.5">WhatsApp: (86) 98195-5717</div>
+            </div>
+            <div className="border-t border-dashed border-gray-300 my-2" />
+            <div className="text-center text-gray-500 mb-1">
+              {isFiado ? '*** VENDA FIADO — PENDENTE ***' : '*** CUPOM NÃO FISCAL ***'}
+            </div>
+            <div className="text-gray-500 text-center">{new Date(sale.date).toLocaleString('pt-BR')}</div>
+            {client && <div className="text-center mt-1 font-bold">Cliente: {client.name}</div>}
+            <div className="border-t border-dashed border-gray-300 my-2" />
+            {/* Itens */}
+            <div className="space-y-1.5">
+              {sale.items.map((item, i) => (
+                <div key={i}>
+                  <div className="font-medium">{item.name}</div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>{item.quantity}x {formatCurrency(item.unitPrice)}</span>
+                    <span className="font-semibold">{formatCurrency(item.subtotal)}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t-2 border-dashed border-gray-300 my-2" />
-
-          {/* Total */}
-          <div className="space-y-1">
+              ))}
+            </div>
+            <div className="border-t border-dashed border-gray-300 my-2" />
+            {/* Total */}
             <div className="flex justify-between font-black text-sm">
               <span>TOTAL</span>
               <span>{formatCurrency(sale.total)}</span>
             </div>
-            <div className="flex justify-between text-gray-600">
+            <div className="flex justify-between text-gray-600 mt-1">
               <span>{getPaymentLabel(sale.paymentMethod)}</span>
               {sale.paymentMethod === 'dinheiro' && <span>Pago: {formatCurrency(sale.amountPaid)}</span>}
             </div>
             {sale.paymentMethod === 'dinheiro' && sale.change > 0 && (
-              <div className="flex justify-between font-bold">
+              <div className="flex justify-between font-bold mt-1">
                 <span>TROCO</span>
                 <span>{formatCurrency(sale.change)}</span>
               </div>
             )}
-            {sale.status === 'pendente' && (
+            {isFiado && (
               <div className="mt-2 p-2 border-2 border-gray-400 rounded text-center font-bold">
                 PENDENTE — A RECEBER
               </div>
             )}
-          </div>
-
-          <div className="border-t-2 border-dashed border-gray-300 my-2" />
-
-          {/* Contato e pagamento */}
-          <div className="text-center space-y-1.5">
-            <p className="text-gray-500 font-semibold uppercase tracking-wide" style={{ fontSize: '9px' }}>
-              Contato &amp; Pagamento
-            </p>
-            <div>
-              <div className="text-gray-500">📱 WhatsApp</div>
-              <div className="font-bold">(86) 98195-5717</div>
+            <div className="border-t border-dashed border-gray-300 my-2" />
+            {/* Contato */}
+            <div className="text-center space-y-1.5">
+              <p className="text-gray-500 font-semibold uppercase tracking-wide" style={{ fontSize: '9px' }}>
+                Contato &amp; Pagamento
+              </p>
+              <div>
+                <div className="text-gray-500">WhatsApp</div>
+                <div className="font-bold">(86) 98195-5717</div>
+              </div>
+              <div>
+                <div className="text-gray-500">Pix CPF</div>
+                <div className="font-bold">049.836.913-75</div>
+              </div>
             </div>
-            <div>
-              <div className="text-gray-500">💳 Pix CPF</div>
-              <div className="font-bold">049.836.913-75</div>
+            <div className="border-t border-dashed border-gray-300 my-2" />
+            {/* Rodapé */}
+            <div className="text-center text-gray-500 space-y-0.5">
+              <p className="font-medium text-black">Obrigado pela preferência!</p>
+              <p>Volte sempre!</p>
+              <p className="mt-1 text-gray-400" style={{ fontSize: '9px' }}>#{sale.id.slice(-8).toUpperCase()}</p>
             </div>
           </div>
 
-          <div className="border-t-2 border-dashed border-gray-300 my-2" />
-
-          {/* Rodapé */}
-          <div className="text-center text-gray-500 space-y-0.5">
-            <p className="font-medium text-black">Obrigado pela preferência!</p>
-            <p>Volte sempre!</p>
-            <p className="mt-1 text-gray-400" style={{ fontSize: '9px' }}>#{sale.id.slice(-8).toUpperCase()}</p>
+          <div className="px-4 pb-4 pt-3 flex gap-2 border-t border-gray-100 flex-shrink-0">
+            <button
+              onClick={() => window.print()}
+              className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white py-2.5 rounded-xl font-medium text-sm"
+            >
+              <Printer size={16} /> Imprimir
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-medium text-sm"
+            >
+              Fechar
+            </button>
           </div>
-        </div>
-
-        <div className="px-4 pb-4 flex gap-2 print:hidden">
-          <button onClick={handlePrint} className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white py-2.5 rounded-xl font-medium text-sm">
-            <Printer size={16} /> Imprimir
-          </button>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-medium text-sm">
-            Fechar
-          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

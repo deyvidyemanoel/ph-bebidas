@@ -31,27 +31,29 @@ body {
   background: #FFD700;
 }
 
+/* Receipt: oculto na tela, exibido só na impressão via portal */
+#receipt-print {
+  display: none;
+}
+
 @media print {
   @page {
     size: 80mm auto;
     margin: 0;
   }
-  body * {
-    visibility: hidden;
-  }
-  #receipt-print, #receipt-print * {
-    visibility: visible;
+  /* Oculta tudo no body exceto o recibo renderizado via portal */
+  body > *:not(#receipt-print) {
+    display: none !important;
   }
   #receipt-print {
-    position: fixed;
-    left: 0;
-    top: 0;
+    display: block !important;
     width: 80mm;
     box-sizing: border-box;
-    padding: 5mm 4mm !important;
-    background: white !important;
-    color: black !important;
-    font-size: 10px !important;
-    line-height: 1.4;
+    padding: 4mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #000;
+    background: #fff;
   }
 }
