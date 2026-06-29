@@ -41,7 +41,6 @@ body {
     size: 80mm auto;
     margin: 0;
   }
-  /* Oculta tudo no body exceto o recibo renderizado via portal */
   body > *:not(#receipt-print) {
     display: none !important;
   }
@@ -49,11 +48,14 @@ body {
     display: block !important;
     width: 80mm;
     box-sizing: border-box;
-    padding: 4mm;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
-    line-height: 1.5;
+    margin: 0;
+    padding: 2mm;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.4;
     color: #000;
     background: #fff;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 }
