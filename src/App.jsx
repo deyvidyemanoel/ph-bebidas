@@ -72,10 +72,10 @@ export default function App() {
       case 'configuracoes':
         return (
           <Settings
-            products={products}
-            sales={sales}
-            clients={clients}
-            movements={movements}
+            products={products} setProducts={setProducts}
+            sales={sales} setSales={setSales}
+            clients={clients} setClients={setClients}
+            movements={movements} setMovements={setMovements}
             onReset={handleReset}
           />
         );
