@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   Search, ShoppingCart, Trash2, Plus, Minus, X,
   Check, Printer, CreditCard, Banknote, Smartphone,
-  User, AlertTriangle, Clock
+  User, AlertTriangle, Clock, Tag
 } from 'lucide-react';
 import { generateId, formatCurrency, PAYMENT_METHODS, getPaymentLabel } from '../utils/helpers';
 
@@ -425,7 +425,11 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
   const [cart, setCart] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
   const [lastSale, setLastSale] = useState(null);
+  const [showAvulso, setShowAvulso] = useState(false);
+  const [avulsoDesc, setAvulsoDesc] = useState('');
+  const [avulsoValue, setAvulsoValue] = useState('');
   const searchRef = useRef(null);
+  const avulsoDescRef = useRef(null);
 
   const searchResults = search.trim().length >= 1
     ? products.filter(p =>
@@ -459,6 +463,24 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
     setTimeout(() => searchRef.current?.focus(), 50);
   };
 
+  const addAvulso = () => {
+    const value = parseFloat(avulsoValue);
+    if (!avulsoDesc.trim() || !value || value <= 0) return;
+    setCart(prev => [...prev, {
+      productId: `avulso_${Date.now()}`,
+      name: avulsoDesc.trim(),
+      brand: '',
+      unitPrice: value,
+      quantity: 1,
+      subtotal: value,
+      maxQty: 999,
+      isAvulso: true,
+    }]);
+    setAvulsoDesc('');
+    setAvulsoValue('');
+    setShowAvulso(false);
+  };
+
   const setQty = (productId, qty) => {
     if (qty <= 0) { setCart(prev => prev.filter(i => i.productId !== productId)); return; }
     setCart(prev => prev.map(i => {
@@ -483,20 +505,23 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
 
     setSales(prev => [sale, ...prev]);
 
-    const newMovs = cart.map(item => ({
-      id: generateId(), date: now,
-      productId: item.productId, productName: item.name,
-      type: 'saida', quantity: item.quantity,
-      reason: status === 'pendente'
-        ? `Fiado #${sale.id.slice(-6).toUpperCase()}`
-        : `Venda #${sale.id.slice(-6).toUpperCase()}`,
-    }));
-    setMovements(prev => [...newMovs, ...prev]);
-
-    setProducts(prev => prev.map(p => {
-      const ci = cart.find(i => i.productId === p.id);
-      return ci ? { ...p, quantity: p.quantity - ci.quantity } : p;
-    }));
+    // Itens avulsos não afetam estoque nem movimentações
+    const stockItems = cart.filter(i => !i.isAvulso);
+    if (stockItems.length > 0) {
+      const newMovs = stockItems.map(item => ({
+        id: generateId(), date: now,
+        productId: item.productId, productName: item.name,
+        type: 'saida', quantity: item.quantity,
+        reason: status === 'pendente'
+          ? `Fiado #${sale.id.slice(-6).toUpperCase()}`
+          : `Venda #${sale.id.slice(-6).toUpperCase()}`,
+      }));
+      setMovements(prev => [...newMovs, ...prev]);
+      setProducts(prev => prev.map(p => {
+        const ci = stockItems.find(i => i.productId === p.id);
+        return ci ? { ...p, quantity: p.quantity - ci.quantity } : p;
+      }));
+    }
 
     setLastSale(sale);
     setCart([]);
@@ -562,6 +587,71 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
             </div>
           )}
 
+          {/* Valor Avulso */}
+          <div>
+            <button
+              onClick={() => {
+                setShowAvulso(v => !v);
+                if (!showAvulso) setTimeout(() => avulsoDescRef.current?.focus(), 50);
+              }}
+              className={`w-full flex items-center justify-center gap-2 border border-dashed rounded-2xl py-2.5 text-sm font-medium transition-colors
+                ${showAvulso
+                  ? 'border-purple-500/50 bg-purple-500/8 text-purple-400'
+                  : 'border-dark-300 text-gray-600 hover:text-gray-300 hover:border-dark-200'}`}
+            >
+              <Tag size={14} />
+              Valor Avulso
+            </button>
+
+            {showAvulso && (
+              <div className="mt-2 bg-dark-700 border border-dark-400 rounded-2xl p-4 space-y-3">
+                <div>
+                  <label className="block text-gray-500 text-xs font-medium uppercase tracking-wide mb-1.5">
+                    Descrição
+                  </label>
+                  <input
+                    ref={avulsoDescRef}
+                    className="w-full bg-dark-600 border border-dark-300 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 text-sm transition-colors"
+                    placeholder="Ex: Serviço de entrega, taxa..."
+                    value={avulsoDesc}
+                    onChange={e => setAvulsoDesc(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && avulsoValue && addAvulso()}
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-500 text-xs font-medium uppercase tracking-wide mb-1.5">
+                    Valor (R$)
+                  </label>
+                  <input
+                    className="w-full bg-dark-600 border border-dark-300 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 text-sm transition-colors font-mono"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={avulsoValue}
+                    onChange={e => setAvulsoValue(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && avulsoDesc.trim() && addAvulso()}
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => { setShowAvulso(false); setAvulsoDesc(''); setAvulsoValue(''); }}
+                    className="flex-1 py-2 rounded-xl border border-dark-300 text-gray-500 hover:text-white text-sm transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={addAvulso}
+                    disabled={!avulsoDesc.trim() || !avulsoValue || parseFloat(avulsoValue) <= 0}
+                    className="flex-1 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    <Plus size={14} /> Adicionar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {todaySales.length > 0 && (
             <div className="bg-dark-700 border border-dark-400 rounded-2xl p-4 flex items-center justify-between">
               <div>
@@ -607,7 +697,12 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
                 {cart.map(item => (
                   <div key={item.productId} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-dark-600/50 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium leading-tight">{item.name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-white text-sm font-medium leading-tight">{item.name}</p>
+                        {item.isAvulso && (
+                          <span className="text-xs bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded font-medium flex-shrink-0">Avulso</span>
+                        )}
+                      </div>
                       <p className="text-gray-600 text-xs">{formatCurrency(item.unitPrice)}/un</p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
