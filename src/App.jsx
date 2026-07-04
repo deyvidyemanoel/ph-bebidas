@@ -6,6 +6,7 @@ import Stock from './components/Stock';
 import PDV from './components/PDV';
 import Reports from './components/Reports';
 import Clients from './components/Clients';
+import Comanda from './components/Comanda';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -20,6 +21,7 @@ export default function App() {
   const [sales, setSales] = useLocalStorage('ph_sales', []);
   const [clients, setClients] = useLocalStorage('ph_clients', []);
   const [movements, setMovements] = useLocalStorage('ph_movements', []);
+  const [comandas, setComandas] = useLocalStorage('ph_comandas', []);
 
   if (!isLoggedIn) {
     return <Login onLogin={() => setIsLoggedIn(true)} />;
@@ -29,6 +31,7 @@ export default function App() {
     dashboard: 'Início',
     estoque: 'Estoque',
     pdv: 'PDV',
+    comanda: 'Comanda',
     relatorios: 'Relatórios',
     clientes: 'Clientes',
     configuracoes: 'Configurações',
@@ -63,6 +66,15 @@ export default function App() {
             sales={sales} setSales={setSales}
             clients={clients}
             movements={movements} setMovements={setMovements}
+          />
+        );
+      case 'comanda':
+        return (
+          <Comanda
+            products={products} setProducts={setProducts}
+            sales={sales} setSales={setSales}
+            movements={movements} setMovements={setMovements}
+            comandas={comandas} setComandas={setComandas}
           />
         );
       case 'relatorios':

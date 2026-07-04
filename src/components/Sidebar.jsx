@@ -1,10 +1,11 @@
 import React from 'react';
-import { LayoutDashboard, Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X, ClipboardList } from 'lucide-react';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Início', icon: LayoutDashboard },
   { id: 'estoque', label: 'Estoque', icon: Package },
   { id: 'pdv', label: 'PDV', icon: ShoppingCart },
+  { id: 'comanda', label: 'Comanda', icon: ClipboardList },
   { id: 'relatorios', label: 'Relatórios', icon: BarChart2 },
   { id: 'clientes', label: 'Clientes', icon: Users },
 ];

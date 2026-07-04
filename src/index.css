@@ -31,8 +31,9 @@ body {
   background: #FFD700;
 }
 
-/* Receipt: oculto na tela, exibido só na impressão via portal */
-#receipt-print {
+/* Recibos: ocultos na tela, exibidos via portal apenas na impressão */
+#receipt-print,
+#comanda-receipt-print {
   display: none;
 }
 
@@ -41,10 +42,11 @@ body {
     size: 80mm auto;
     margin: 0;
   }
-  body > *:not(#receipt-print) {
+  body > *:not(#receipt-print):not(#comanda-receipt-print) {
     display: none !important;
   }
-  #receipt-print {
+  #receipt-print,
+  #comanda-receipt-print {
     display: block !important;
     width: 80mm;
     box-sizing: border-box;
