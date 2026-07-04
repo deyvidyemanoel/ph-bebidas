@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ClipboardList, Plus, Search, Minus, X, Check, Printer,
-  CreditCard, Banknote, Smartphone, ArrowLeft, Trash2, Clock
+  CreditCard, Banknote, Smartphone, ArrowLeft, Trash2, Clock, Tag
 } from 'lucide-react';
 import {
   generateId, formatCurrency, PAYMENT_METHODS, getPaymentLabel
@@ -344,8 +344,12 @@ export default function Comanda({
   const [showPayment, setShowPayment] = useState(false);
   const [printData, setPrintData] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [showAvulso, setShowAvulso] = useState(false);
+  const [avulsoDesc, setAvulsoDesc] = useState('');
+  const [avulsoValue, setAvulsoValue] = useState('');
   const searchRef = useRef(null);
   const newNameRef = useRef(null);
+  const avulsoDescRef = useRef(null);
 
   const selected = comandas.find(c => c.id === selectedId) ?? null;
   const selectedTotal = selected
@@ -374,6 +378,27 @@ export default function Comanda({
     setSelectedId(c.id);
     setNewName('');
     setShowNewModal(false);
+  };
+
+  const addAvulso = () => {
+    const value = parseFloat(avulsoValue);
+    if (!avulsoDesc.trim() || !value || value <= 0) return;
+    const item = {
+      productId: `avulso_${Date.now()}`,
+      name: avulsoDesc.trim(),
+      brand: '',
+      unitPrice: value,
+      quantity: 1,
+      subtotal: value,
+      isAvulso: true,
+    };
+    setComandas(prev => prev.map(c =>
+      c.id === selectedId ? { ...c, items: [...c.items, item] } : c
+    ));
+    setAvulsoDesc('');
+    setAvulsoValue('');
+    setShowAvulso(false);
+    setTimeout(() => searchRef.current?.focus(), 50);
   };
 
   const addItem = (product) => {
@@ -445,20 +470,22 @@ export default function Comanda({
 
     setSales(prev => [sale, ...prev]);
 
-    const newMovs = selected.items.map(item => ({
-      id: generateId(), date: now,
-      productId: item.productId,
-      productName: item.name,
-      type: 'saida',
-      quantity: item.quantity,
-      reason: `Comanda - ${selected.customerName}`,
-    }));
-    setMovements(prev => [...newMovs, ...prev]);
-
-    setProducts(prev => prev.map(p => {
-      const ci = selected.items.find(i => i.productId === p.id);
-      return ci ? { ...p, quantity: p.quantity - ci.quantity } : p;
-    }));
+    const stockItems = selected.items.filter(i => !i.isAvulso);
+    if (stockItems.length > 0) {
+      const newMovs = stockItems.map(item => ({
+        id: generateId(), date: now,
+        productId: item.productId,
+        productName: item.name,
+        type: 'saida',
+        quantity: item.quantity,
+        reason: `Comanda - ${selected.customerName}`,
+      }));
+      setMovements(prev => [...newMovs, ...prev]);
+      setProducts(prev => prev.map(p => {
+        const ci = stockItems.find(i => i.productId === p.id);
+        return ci ? { ...p, quantity: p.quantity - ci.quantity } : p;
+      }));
+    }
 
     const pd = {
       ...selected,
@@ -679,6 +706,56 @@ export default function Comanda({
             )}
           </div>
 
+          {/* Valor Avulso */}
+          <button
+            onClick={() => {
+              setShowAvulso(v => !v);
+              if (!showAvulso) setTimeout(() => avulsoDescRef.current?.focus(), 50);
+            }}
+            className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all
+              ${showAvulso
+                ? 'border-purple-500/50 bg-purple-500/10 text-purple-400'
+                : 'border-dashed border-dark-300 text-gray-500 hover:border-dark-200 hover:text-gray-300'}`}
+          >
+            <Tag size={15} />
+            Valor Avulso
+            {showAvulso ? <X size={14} className="ml-auto" /> : <Plus size={14} className="ml-auto" />}
+          </button>
+
+          {showAvulso && (
+            <div className="bg-dark-700 border border-purple-500/30 rounded-2xl p-4 space-y-3">
+              <div>
+                <label className="block text-gray-500 text-xs font-medium uppercase tracking-wide mb-1.5">Descrição</label>
+                <input
+                  ref={avulsoDescRef}
+                  className="w-full bg-dark-600 border border-dark-300 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+                  placeholder="Ex: Copo descartável, Gelo..."
+                  value={avulsoDesc}
+                  onChange={e => setAvulsoDesc(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && avulsoValue && addAvulso()}
+                />
+              </div>
+              <div>
+                <label className="block text-gray-500 text-xs font-medium uppercase tracking-wide mb-1.5">Valor (R$)</label>
+                <input
+                  className="w-full bg-dark-600 border border-dark-300 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+                  placeholder="0,00"
+                  type="number" step="0.01" min="0"
+                  value={avulsoValue}
+                  onChange={e => setAvulsoValue(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addAvulso()}
+                />
+              </div>
+              <button
+                onClick={addAvulso}
+                disabled={!avulsoDesc.trim() || !avulsoValue || parseFloat(avulsoValue) <= 0}
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Plus size={15} /> Adicionar à Comanda
+              </button>
+            </div>
+          )}
+
           {searchResults.length > 0 && (
             <div className="bg-dark-700 border border-dark-400 rounded-2xl overflow-hidden">
               {searchResults.map(p => (
@@ -743,7 +820,12 @@ export default function Comanda({
                 {selected.items.map(item => (
                   <div key={item.productId} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-dark-600/50 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium leading-tight">{item.name}</p>
+                      <p className="text-white text-sm font-medium leading-tight">
+                        {item.name}
+                        {item.isAvulso && (
+                          <span className="ml-1.5 text-xs bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded font-medium">Avulso</span>
+                        )}
+                      </p>
                       <p className="text-gray-600 text-xs">{formatCurrency(item.unitPrice)}/un</p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
