@@ -1,16 +1,23 @@
 import React from 'react';
-import { LayoutDashboard, Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X, ClipboardList } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X, ClipboardList } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Início', icon: LayoutDashboard },
-  { id: 'estoque', label: 'Estoque', icon: Package },
-  { id: 'pdv', label: 'PDV', icon: ShoppingCart },
-  { id: 'comanda', label: 'Comanda', icon: ClipboardList },
-  { id: 'relatorios', label: 'Relatórios', icon: BarChart2 },
-  { id: 'clientes', label: 'Clientes', icon: Users },
+  { to: '/pdv', label: 'PDV', icon: ShoppingCart, match: (p) => p === '/' || p.startsWith('/pdv') },
+  { to: '/comandas', label: 'Comandas', icon: ClipboardList, match: (p) => p.startsWith('/comandas') },
+  { to: '/estoque', label: 'Estoque', icon: Package, match: (p) => p.startsWith('/estoque') },
+  { to: '/clientes', label: 'Clientes', icon: Users, match: (p) => p.startsWith('/clientes') },
+  { to: '/relatorios', label: 'Relatórios', icon: BarChart2, match: (p) => p.startsWith('/relatorios') },
 ];
 
-export default function Sidebar({ activeTab, onTabChange, isOpen, onToggle, onLogout }) {
+export default function Sidebar({ isOpen, onToggle, onLogout }) {
+  const { pathname } = useLocation();
+  const configActive = pathname.startsWith('/configuracoes');
+
+  const closeOnMobile = () => {
+    if (window.innerWidth < 1024) onToggle();
+  };
+
   return (
     <>
       {isOpen && (
@@ -43,42 +50,47 @@ export default function Sidebar({ activeTab, onTabChange, isOpen, onToggle, onLo
 
         {/* Nav */}
         <nav className="flex-1 p-4 space-y-1">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => { onTabChange(id); if (window.innerWidth < 1024) onToggle(); }}
-              className={`
-                w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200
-                ${activeTab === id
-                  ? 'bg-gold-500/15 text-gold-400 border border-gold-500/25 shadow-sm'
-                  : 'text-gray-400 hover:text-white hover:bg-dark-500 border border-transparent'}
-              `}
-            >
-              <Icon size={19} />
-              <span className="font-medium">{label}</span>
-              {activeTab === id && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-gold-400" />
-              )}
-            </button>
-          ))}
+          {NAV_ITEMS.map(({ to, label, icon: Icon, match }) => {
+            const active = match(pathname);
+            return (
+              <Link
+                key={to}
+                to={to}
+                onClick={closeOnMobile}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200
+                  ${active
+                    ? 'bg-gold-500/15 text-gold-400 border border-gold-500/25 shadow-sm'
+                    : 'text-gray-400 hover:text-white hover:bg-dark-500 border border-transparent'}
+                `}
+              >
+                <Icon size={19} />
+                <span className="font-medium">{label}</span>
+                {active && (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-gold-400" />
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="px-4 pb-4 border-t border-dark-400 pt-3 space-y-1">
-          <button
-            onClick={() => { onTabChange('configuracoes'); if (window.innerWidth < 1024) onToggle(); }}
+          <Link
+            to="/configuracoes"
+            onClick={closeOnMobile}
             className={`
               w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200
-              ${activeTab === 'configuracoes'
+              ${configActive
                 ? 'bg-gold-500/15 text-gold-400 border border-gold-500/25 shadow-sm'
                 : 'text-gray-500 hover:text-white hover:bg-dark-500 border border-transparent'}
             `}
           >
             <Settings size={19} />
             <span className="font-medium">Configurações</span>
-            {activeTab === 'configuracoes' && (
+            {configActive && (
               <div className="ml-auto w-1.5 h-1.5 rounded-full bg-gold-400" />
             )}
-          </button>
+          </Link>
 
           <button
             onClick={onLogout}

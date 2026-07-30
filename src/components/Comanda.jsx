@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ClipboardList, Plus, Search, Minus, X, Check, Printer,
   CreditCard, Banknote, Smartphone, ArrowLeft, Trash2, Clock, Tag
@@ -337,7 +338,10 @@ export default function Comanda({
   movements, setMovements,
   comandas, setComandas,
 }) {
-  const [selectedId, setSelectedId] = useState(null);
+  // O id da comanda aberta vem da URL (/comandas/:id), não de estado local,
+  // assim a comanda selecionada é compartilhável/persiste no F5.
+  const { id: selectedId } = useParams();
+  const navigate = useNavigate();
   const [showNewModal, setShowNewModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [search, setSearch] = useState('');
@@ -375,7 +379,7 @@ export default function Comanda({
       items: [],
     };
     setComandas(prev => [...prev, c]);
-    setSelectedId(c.id);
+    navigate(`/comandas/${c.id}`);
     setNewName('');
     setShowNewModal(false);
   };
@@ -448,7 +452,7 @@ export default function Comanda({
 
   const deleteComanda = (id) => {
     setComandas(prev => prev.filter(c => c.id !== id));
-    if (selectedId === id) setSelectedId(null);
+    if (selectedId === id) navigate('/comandas');
     setDeleteConfirmId(null);
   };
 
@@ -496,7 +500,7 @@ export default function Comanda({
       closedAt: now,
     };
     setComandas(prev => prev.filter(c => c.id !== selectedId));
-    setSelectedId(null);
+    navigate('/comandas');
     setShowPayment(false);
     setPrintData(pd);
   };
@@ -564,7 +568,7 @@ export default function Comanda({
                   </p>
                   <p className="text-gold-400 font-black text-2xl mt-2">{formatCurrency(tot)}</p>
                   <button
-                    onClick={() => setSelectedId(c.id)}
+                    onClick={() => navigate(`/comandas/${c.id}`)}
                     className="mt-3 w-full py-2 rounded-xl bg-dark-600 border border-dark-300 hover:border-gold-500/50 hover:bg-gold-500/8 text-gray-400 hover:text-gold-400 text-sm font-medium transition-colors"
                   >
                     Abrir comanda →
@@ -663,7 +667,7 @@ export default function Comanda({
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          onClick={() => { setSelectedId(null); setSearch(''); }}
+          onClick={() => { navigate('/comandas'); setSearch(''); }}
           className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors text-sm"
         >
           <ArrowLeft size={16} /> Voltar

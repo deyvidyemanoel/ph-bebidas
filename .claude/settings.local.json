@@ -3,7 +3,23 @@
     "allow": [
       "Bash(npm install *)",
       "Bash(npm run *)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(grep -rn \"activeTab\\\\|onTabChange\\\\|tabLabels\\\\|setSelectedId\\\\|setSelected\\(\" src/)",
+      "Bash(grep -rn \"Dashboard\" src/App.jsx src/components/Layout.jsx)",
+      "Skill(run)",
+      "Bash(chromium-cli --help)",
+      "Bash(node -e \"require.resolve\\('playwright'\\)\")",
+      "Bash(npx --yes playwright --version)",
+      "Bash(npx playwright *)",
+      "Bash(node /tmp/verify-routes.mjs)",
+      "Bash(cp /tmp/verify-routes.mjs \"/Users/deyvidyemanoel/Documents/vscode/sistema ph bebidas/verify-routes.mjs\")",
+      "Bash(node verify-routes.mjs)",
+      "Bash(node verify-ids.mjs)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(rm -f verify-routes.mjs verify-ids.mjs)",
+      "Bash(npm uninstall *)",
+      "Bash(git checkout *)",
+      "Bash(rm -f dist/assets/index-acad425a.js)"
     ]
   }
 }

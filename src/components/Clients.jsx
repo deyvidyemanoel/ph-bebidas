@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   UserPlus, Search, Phone, Mail, Edit2, Trash2, X,
   Users, ArrowLeft, ShoppingBag, Check, Clock, Wallet
@@ -204,10 +205,13 @@ function ClientProfile({ client, sales, setSales, onBack }) {
 }
 
 export default function Clients({ clients, setClients, sales, setSales }) {
+  // O cliente selecionado vem da URL (/clientes/:id), não de estado local,
+  // assim o perfil é compartilhável/persiste no F5.
+  const { id: selected } = useParams();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [selected, setSelected] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
 
   const getClientData = (clientId) => {
@@ -239,10 +243,16 @@ export default function Clients({ clients, setClients, sales, setSales }) {
 
   const totalDebtAll = clients.reduce((sum, c) => sum + getClientData(c.id).debt, 0);
 
+  const selectedClient = selected ? clients.find(c => c.id === selected) : null;
+
+  // Se o :id da URL não corresponde a nenhum cliente (ex: excluído), volta para a lista.
+  useEffect(() => {
+    if (selected && !selectedClient) navigate('/clientes', { replace: true });
+  }, [selected, selectedClient, navigate]);
+
   if (selected) {
-    const client = clients.find(c => c.id === selected);
-    if (!client) { setSelected(null); return null; }
-    return <ClientProfile client={client} sales={sales} setSales={setSales} onBack={() => setSelected(null)} />;
+    if (!selectedClient) return null;
+    return <ClientProfile client={selectedClient} sales={sales} setSales={setSales} onBack={() => navigate('/clientes')} />;
   }
 
   return (
@@ -300,14 +310,14 @@ export default function Clients({ clients, setClients, sales, setSales }) {
                 ${data.debt > 0 ? 'hover:bg-orange-500/5' : 'hover:bg-dark-600/30'}`}
               >
                 <button
-                  onClick={() => setSelected(client.id)}
+                  onClick={() => navigate(`/clientes/${client.id}`)}
                   className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-xl flex-shrink-0 transition-colors
                     ${data.debt > 0 ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : 'bg-gold-500/15 text-gold-400 hover:bg-gold-500/25'}`}
                 >
                   {client.name.charAt(0).toUpperCase()}
                 </button>
 
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelected(client.id)}>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/clientes/${client.id}`)}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-white font-medium">{client.name}</p>
                     {data.debt > 0 && (

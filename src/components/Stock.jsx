@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Edit2, Trash2, ArrowUp, ArrowDown,
   AlertTriangle, Package, X, History
@@ -197,6 +198,8 @@ function DeleteModal({ onConfirm, onClose }) {
 }
 
 export default function Stock({ products, setProducts, movements, setMovements }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [tab, setTab] = useState('produtos');
@@ -204,6 +207,19 @@ export default function Stock({ products, setProducts, movements, setMovements }
   const [editing, setEditing] = useState(null);
   const [movModal, setMovModal] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
+
+  const isNewRoute = location.pathname === '/estoque/novo';
+
+  // "/estoque/novo" abre o formulário de cadastro automaticamente.
+  useEffect(() => {
+    if (isNewRoute) { setEditing(null); setShowProduct(true); }
+  }, [isNewRoute]);
+
+  const closeProductModal = () => {
+    setShowProduct(false);
+    setEditing(null);
+    if (isNewRoute) navigate('/estoque');
+  };
 
   const filtered = products.filter(p => {
     const matchQ = p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase());
@@ -214,8 +230,7 @@ export default function Stock({ products, setProducts, movements, setMovements }
   const handleSave = (data) => {
     if (editing) setProducts(prev => prev.map(p => p.id === data.id ? data : p));
     else setProducts(prev => [...prev, data]);
-    setShowProduct(false);
-    setEditing(null);
+    closeProductModal();
   };
 
   const handleMovement = (product, type, { quantity, reason }) => {
@@ -239,7 +254,7 @@ export default function Stock({ products, setProducts, movements, setMovements }
           <p className="text-gray-500 text-sm">{products.length} produto(s) cadastrado(s)</p>
         </div>
         <button
-          onClick={() => { setEditing(null); setShowProduct(true); }}
+          onClick={() => navigate('/estoque/novo')}
           className="flex items-center gap-2 bg-gold-500 text-black font-bold px-4 py-2.5 rounded-xl hover:bg-gold-400 transition-colors"
         >
           <Plus size={18} />
@@ -391,7 +406,7 @@ export default function Stock({ products, setProducts, movements, setMovements }
         </div>
       )}
 
-      {showProduct && <ProductModal product={editing} onSave={handleSave} onClose={() => { setShowProduct(false); setEditing(null); }} />}
+      {showProduct && <ProductModal product={editing} onSave={handleSave} onClose={closeProductModal} />}
       {movModal && <MovementModal product={movModal.product} type={movModal.type} onSave={d => handleMovement(movModal.product, movModal.type, d)} onClose={() => setMovModal(null)} />}
       {delConfirm && <DeleteModal onConfirm={() => { setProducts(p => p.filter(x => x.id !== delConfirm)); setDelConfirm(null); }} onClose={() => setDelConfirm(null)} />}
     </div>
