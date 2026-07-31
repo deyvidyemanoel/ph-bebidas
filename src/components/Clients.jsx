@@ -4,16 +4,23 @@ import {
   UserPlus, Search, Phone, Mail, Edit2, Trash2, X,
   Users, ArrowLeft, ShoppingBag, Check, Clock, Wallet
 } from 'lucide-react';
-import { generateId, formatCurrency, formatDate, formatDateTime } from '../utils/helpers';
+import { formatCurrency, formatDate, formatDateTime } from '../utils/helpers';
+import { Toast } from './Toast';
 
 function ClientModal({ client, onSave, onClose }) {
   const [form, setForm] = useState(client || { name: '', phone: '', email: '' });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) { setErrors({ name: 'Nome obrigatório' }); return; }
-    onSave({ ...form, id: form.id || generateId(), createdAt: form.createdAt || new Date().toISOString() });
+    setSaving(true);
+    try {
+      await onSave({ ...form });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const ic = 'w-full bg-dark-600 border border-dark-300 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-gold-500 text-sm transition-colors';
@@ -40,9 +47,9 @@ function ClientModal({ client, onSave, onClose }) {
             <input className={ic} placeholder="email@exemplo.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} type="email" />
           </div>
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors">Cancelar</button>
-            <button type="submit" className="flex-1 py-2.5 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors">
-              {client ? 'Salvar' : 'Cadastrar'}
+            <button type="button" onClick={onClose} disabled={saving} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors disabled:opacity-50">Cancelar</button>
+            <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              {saving ? 'Salvando...' : (client ? 'Salvar' : 'Cadastrar')}
             </button>
           </div>
         </form>
@@ -52,6 +59,17 @@ function ClientModal({ client, onSave, onClose }) {
 }
 
 function MarkPaidModal({ sale, onConfirm, onClose }) {
+  const [saving, setSaving] = useState(false);
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    try {
+      await onConfirm();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
       <div className="bg-dark-700 border border-dark-400 rounded-2xl w-full max-w-sm">
@@ -68,9 +86,9 @@ function MarkPaidModal({ sale, onConfirm, onClose }) {
           </div>
           <p className="text-gray-400 text-sm">Confirmar que este fiado foi quitado?</p>
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors">Cancelar</button>
-            <button onClick={onConfirm} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2">
-              <Check size={16} /> Marcar Pago
+            <button onClick={onClose} disabled={saving} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors disabled:opacity-50">Cancelar</button>
+            <button onClick={handleConfirm} disabled={saving} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+              <Check size={16} /> {saving ? 'Confirmando...' : 'Marcar Pago'}
             </button>
           </div>
         </div>
@@ -79,7 +97,7 @@ function MarkPaidModal({ sale, onConfirm, onClose }) {
   );
 }
 
-function ClientProfile({ client, sales, setSales, onBack }) {
+function ClientProfile({ client, sales, markPaid, onBack, onError }) {
   const [markingPaid, setMarkingPaid] = useState(null);
 
   const allClientSales = sales
@@ -93,9 +111,13 @@ function ClientProfile({ client, sales, setSales, onBack }) {
   const totalSpent = paidSales.reduce((sum, s) => sum + s.total, 0);
   const avgTicket = paidSales.length > 0 ? totalSpent / paidSales.length : 0;
 
-  const handleMarkPaid = (saleId) => {
-    setSales(prev => prev.map(s => s.id === saleId ? { ...s, status: 'pago' } : s));
-    setMarkingPaid(null);
+  const handleMarkPaid = async (saleId) => {
+    try {
+      await markPaid(saleId);
+      setMarkingPaid(null);
+    } catch (err) {
+      onError('Não foi possível marcar o fiado como pago: ' + err.message);
+    }
   };
 
   return (
@@ -204,7 +226,7 @@ function ClientProfile({ client, sales, setSales, onBack }) {
   );
 }
 
-export default function Clients({ clients, setClients, sales, setSales }) {
+export default function Clients({ clients, sales, addClient, updateClient, deleteClient, markPaid }) {
   // O cliente selecionado vem da URL (/clientes/:id), não de estado local,
   // assim o perfil é compartilhável/persiste no F5.
   const { id: selected } = useParams();
@@ -213,6 +235,9 @@ export default function Clients({ clients, setClients, sales, setSales }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showError = (message) => setToast({ type: 'error', message });
 
   const getClientData = (clientId) => {
     const clientSales = sales.filter(s => s.customerId === clientId);
@@ -234,11 +259,15 @@ export default function Clients({ clients, setClients, sales, setSales }) {
       return db - da;
     });
 
-  const handleSave = (data) => {
-    if (editing) setClients(prev => prev.map(c => c.id === data.id ? data : c));
-    else setClients(prev => [...prev, data]);
-    setShowModal(false);
-    setEditing(null);
+  const handleSave = async (data) => {
+    try {
+      if (editing) await updateClient({ ...editing, ...data });
+      else await addClient(data);
+      setShowModal(false);
+      setEditing(null);
+    } catch (err) {
+      showError('Não foi possível salvar o cliente: ' + err.message);
+    }
   };
 
   const totalDebtAll = clients.reduce((sum, c) => sum + getClientData(c.id).debt, 0);
@@ -252,7 +281,12 @@ export default function Clients({ clients, setClients, sales, setSales }) {
 
   if (selected) {
     if (!selectedClient) return null;
-    return <ClientProfile client={selectedClient} sales={sales} setSales={setSales} onBack={() => navigate('/clientes')} />;
+    return (
+      <>
+        <ClientProfile client={selectedClient} sales={sales} markPaid={markPaid} onBack={() => navigate('/clientes')} onError={showError} />
+        <Toast toast={toast} onClose={() => setToast(null)} />
+      </>
+    );
   }
 
   return (
@@ -367,11 +401,26 @@ export default function Clients({ clients, setClients, sales, setSales }) {
             <p className="text-gray-400 text-sm mb-6">Tem certeza? O histórico de compras será mantido.</p>
             <div className="flex gap-3">
               <button onClick={() => setDelConfirm(null)} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white">Cancelar</button>
-              <button onClick={() => { setClients(prev => prev.filter(c => c.id !== delConfirm)); setDelConfirm(null); }} className="flex-1 py-2.5 bg-red-500 text-white font-bold rounded-xl hover:bg-red-400">Excluir</button>
+              <button
+                onClick={async () => {
+                  try {
+                    await deleteClient(delConfirm);
+                  } catch (err) {
+                    showError('Não foi possível excluir o cliente: ' + err.message);
+                  } finally {
+                    setDelConfirm(null);
+                  }
+                }}
+                className="flex-1 py-2.5 bg-red-500 text-white font-bold rounded-xl hover:bg-red-400"
+              >
+                Excluir
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

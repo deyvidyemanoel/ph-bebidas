@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-const CREDENTIALS = { user: 'phbebidas', pass: 'ph2024' };
-
-export default function Login({ onLogin }) {
+export default function Login() {
+  const { login, authError, clearAuthError } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    if (!authError) return;
+    const messages = {
+      inactive: 'Sua conta está desativada. Fale com o administrador.',
+      'not-found': 'Cadastro de funcionário não encontrado para este usuário. Fale com o administrador.',
+      'query-error': 'Não foi possível verificar sua conta agora. Tente novamente em instantes.',
+    };
+    setError(messages[authError] || 'Não foi possível entrar. Tente novamente.');
+    clearAuthError();
+  }, [authError, clearAuthError]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (username === CREDENTIALS.user && password === CREDENTIALS.pass) {
-      onLogin(); // síncrono — React atualiza o estado no mesmo ciclo de evento
-    } else {
+    setSubmitting(true);
+    try {
+      await login(username.trim(), password);
+      // Em caso de sucesso, o AuthProvider atualiza a sessão e o App troca de tela sozinho.
+    } catch {
       setError('Usuário ou senha incorretos.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -93,11 +108,11 @@ export default function Login({ onLogin }) {
 
             <button
               type="submit"
-              disabled={!username || !password}
+              disabled={!username || !password || submitting}
               className="w-full py-3.5 bg-gold-500 text-black font-black text-base rounded-xl hover:bg-gold-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
             >
               <LogIn size={18} />
-              Entrar
+              {submitting ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
         </div>

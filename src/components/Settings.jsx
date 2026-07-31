@@ -3,9 +3,9 @@ import {
   Trash2, AlertTriangle, ShieldAlert, Package, ShoppingBag,
   Users, X, Check, Download, Upload, Info
 } from 'lucide-react';
-import { INITIAL_PRODUCTS } from '../utils/helpers';
+import { Toast } from './Toast';
 
-function ConfirmModal({ title, description, warning, onConfirm, onClose }) {
+function ConfirmModal({ title, description, warning, onConfirm, onClose, processing }) {
   const [typed, setTyped] = useState('');
   const required = 'CONFIRMAR';
 
@@ -48,17 +48,18 @@ function ConfirmModal({ title, description, warning, onConfirm, onClose }) {
           <div className="flex gap-3 pt-1">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors font-medium"
+              disabled={processing}
+              className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors font-medium disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               onClick={onConfirm}
-              disabled={typed !== required}
+              disabled={typed !== required || processing}
               className="flex-1 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Trash2 size={16} />
-              Apagar Tudo
+              {processing ? 'Processando...' : 'Apagar Tudo'}
             </button>
           </div>
         </div>
@@ -67,7 +68,7 @@ function ConfirmModal({ title, description, warning, onConfirm, onClose }) {
   );
 }
 
-function ImportConfirmModal({ data, onConfirm, onClose }) {
+function ImportConfirmModal({ data, onConfirm, onClose, processing }) {
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
       <div className="bg-dark-700 border border-dark-400 rounded-2xl w-full max-w-md">
@@ -118,16 +119,18 @@ function ImportConfirmModal({ data, onConfirm, onClose }) {
           <div className="flex gap-3 pt-1">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors font-medium"
+              disabled={processing}
+              className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors font-medium disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               onClick={onConfirm}
-              className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 transition-colors flex items-center justify-center gap-2"
+              disabled={processing}
+              className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Upload size={16} />
-              Importar
+              {processing ? 'Importando...' : 'Importar'}
             </button>
           </div>
         </div>
@@ -136,50 +139,19 @@ function ImportConfirmModal({ data, onConfirm, onClose }) {
   );
 }
 
-function SuccessToast({ message, onClose }) {
-  React.useEffect(() => {
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-sm font-medium">
-      <Check size={16} />
-      {message}
-    </div>
-  );
-}
-
-function ErrorToast({ message, onClose }) {
-  React.useEffect(() => {
-    const t = setTimeout(onClose, 4000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-sm font-medium">
-      <AlertTriangle size={16} />
-      {message}
-    </div>
-  );
-}
-
 export default function Settings({
-  products, setProducts,
-  sales, setSales,
-  clients, setClients,
-  movements, setMovements,
+  products, sales, clients, movements,
+  bulkReplaceProducts, bulkReplaceClients, bulkReplaceSales, bulkReplaceMovements,
   onReset,
 }) {
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
-  const [toastType, setToastType] = useState('success');
   const [importData, setImportData] = useState(null);
+  const [processing, setProcessing] = useState(false);
   const fileInputRef = useRef(null);
 
-  const showToast = (msg, type = 'success') => {
-    setToast(msg);
-    setToastType(type);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
   };
 
   const handleExport = () => {
@@ -222,13 +194,35 @@ export default function Settings({
     reader.readAsText(file);
   };
 
-  const handleImportConfirm = () => {
-    setProducts(importData.products);
-    setSales(importData.sales);
-    setClients(importData.clients);
-    setMovements(importData.movements);
-    setImportData(null);
-    showToast('Dados importados com sucesso!');
+  const handleImportConfirm = async () => {
+    setProcessing(true);
+    try {
+      // Ordem importa: clientes e produtos primeiro, para termos o mapa de
+      // id-antigo -> id-novo antes de recriar vendas/movimentações que os referenciam.
+      const clientIdMap = await bulkReplaceClients(importData.clients);
+      const productIdMap = await bulkReplaceProducts(importData.products);
+      await bulkReplaceSales(importData.sales, { clientIdMap, productIdMap });
+      await bulkReplaceMovements(importData.movements, { productIdMap });
+      setImportData(null);
+      showToast('Dados importados com sucesso!');
+    } catch (err) {
+      showToast('Não foi possível importar os dados: ' + err.message, 'error');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const runReset = async (scope, successMessage) => {
+    setProcessing(true);
+    try {
+      await onReset(scope);
+      setModal(null);
+      showToast(successMessage);
+    } catch (err) {
+      showToast('Não foi possível concluir a operação: ' + err.message, 'error');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const actions = [
@@ -243,11 +237,7 @@ export default function Settings({
         description: 'Esta ação irá apagar permanentemente todas as vendas, clientes, histórico de movimentações e redefinir o estoque para os produtos padrão do sistema.',
         warning: 'Esta operação é irreversível. Todos os dados do sistema serão perdidos.',
       },
-      onConfirm: () => {
-        onReset('all');
-        setModal(null);
-        showToast('Todos os dados foram apagados.');
-      },
+      onConfirm: () => runReset('all', 'Todos os dados foram apagados.'),
     },
     {
       id: 'sales',
@@ -260,11 +250,7 @@ export default function Settings({
         description: 'Todas as vendas e o histórico financeiro serão apagados. O estoque e os clientes cadastrados não serão afetados.',
         warning: 'Esta operação é irreversível.',
       },
-      onConfirm: () => {
-        onReset('sales');
-        setModal(null);
-        showToast('Vendas apagadas com sucesso.');
-      },
+      onConfirm: () => runReset('sales', 'Vendas apagadas com sucesso.'),
     },
     {
       id: 'stock',
@@ -277,11 +263,7 @@ export default function Settings({
         description: 'Os produtos serão redefinidos para o catálogo padrão e todo o histórico de movimentações será apagado. Vendas e clientes não são afetados.',
         warning: 'Produtos personalizados e movimentações serão perdidos.',
       },
-      onConfirm: () => {
-        onReset('stock');
-        setModal(null);
-        showToast('Estoque restaurado ao padrão.');
-      },
+      onConfirm: () => runReset('stock', 'Estoque restaurado ao padrão.'),
     },
     {
       id: 'clients',
@@ -294,11 +276,7 @@ export default function Settings({
         description: 'Todos os clientes cadastrados serão removidos. As vendas associadas a eles continuarão existindo, mas sem vínculo com um cliente.',
         warning: 'Esta operação é irreversível.',
       },
-      onConfirm: () => {
-        onReset('clients');
-        setModal(null);
-        showToast('Clientes apagados com sucesso.');
-      },
+      onConfirm: () => runReset('clients', 'Clientes apagados com sucesso.'),
     },
   ];
 
@@ -440,6 +418,7 @@ export default function Settings({
           {...activeAction.modal}
           onConfirm={activeAction.onConfirm}
           onClose={() => setModal(null)}
+          processing={processing}
         />
       )}
 
@@ -448,15 +427,11 @@ export default function Settings({
           data={importData}
           onConfirm={handleImportConfirm}
           onClose={() => setImportData(null)}
+          processing={processing}
         />
       )}
 
-      {toast && toastType === 'success' && (
-        <SuccessToast message={toast} onClose={() => setToast(null)} />
-      )}
-      {toast && toastType === 'error' && (
-        <ErrorToast message={toast} onClose={() => setToast(null)} />
-      )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

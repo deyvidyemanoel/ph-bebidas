@@ -10,9 +10,10 @@ const PAGE_TITLES = [
   { match: (p) => p.startsWith('/clientes'), label: 'Clientes' },
   { match: (p) => p.startsWith('/relatorios'), label: 'Relatórios' },
   { match: (p) => p.startsWith('/configuracoes'), label: 'Configurações' },
+  { match: (p) => p.startsWith('/funcionarios'), label: 'Funcionários' },
 ];
 
-export default function Layout({ onLogout }) {
+export default function Layout({ onLogout, isAdmin }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const pageLabel = PAGE_TITLES.find(t => t.match(location.pathname))?.label ?? '';
@@ -23,6 +24,7 @@ export default function Layout({ onLogout }) {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(o => !o)}
         onLogout={onLogout}
+        isAdmin={isAdmin}
       />
 
       <div className="flex-1 lg:ml-64 flex flex-col min-w-0 overflow-hidden">

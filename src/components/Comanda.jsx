@@ -6,8 +6,9 @@ import {
   CreditCard, Banknote, Smartphone, ArrowLeft, Trash2, Clock, Tag
 } from 'lucide-react';
 import {
-  generateId, formatCurrency, PAYMENT_METHODS, getPaymentLabel
+  formatCurrency, PAYMENT_METHODS, getPaymentLabel
 } from '../utils/helpers';
+import { Toast } from './Toast';
 
 function timeOpen(dateStr) {
   const mins = Math.floor((Date.now() - new Date(dateStr)) / 60000);
@@ -147,14 +148,14 @@ function ComandaPrintPortal({ data }) {
   );
 }
 
-function PaymentModal({ total, onConfirm, onClose }) {
+function PaymentModal({ total, onConfirm, onClose, saving }) {
   const [method, setMethod] = useState('dinheiro');
   const [amountPaid, setAmountPaid] = useState('');
 
   const isCash = method === 'dinheiro';
   const paid = parseFloat(amountPaid) || 0;
   const change = isCash && paid >= total ? paid - total : 0;
-  const canConfirm = isCash ? paid >= total : true;
+  const canConfirm = (isCash ? paid >= total : true) && !saving;
 
   const quickAmounts = [...new Set([
     total,
@@ -241,7 +242,7 @@ function PaymentModal({ total, onConfirm, onClose }) {
             className="w-full py-4 bg-gold-500 text-black font-black text-xl rounded-xl hover:bg-gold-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Check size={22} />
-            Fechar e Registrar
+            {saving ? 'Fechando...' : 'Fechar e Registrar'}
           </button>
         </div>
       </div>
@@ -333,10 +334,15 @@ function ReceiptModal({ data, onClose }) {
 }
 
 export default function Comanda({
-  products, setProducts,
-  sales, setSales,
-  movements, setMovements,
-  comandas, setComandas,
+  products,
+  comandas,
+  createComanda: createComandaApi,
+  addItem: addItemApi,
+  addAvulsoItem: addAvulsoItemApi,
+  setItemQty: setItemQtyApi,
+  clearItems: clearItemsApi,
+  deleteComanda: deleteComandaApi,
+  addSale, decrementForSale, addMovements,
 }) {
   // O id da comanda aberta vem da URL (/comandas/:id), não de estado local,
   // assim a comanda selecionada é compartilhável/persiste no F5.
@@ -351,9 +357,14 @@ export default function Comanda({
   const [showAvulso, setShowAvulso] = useState(false);
   const [avulsoDesc, setAvulsoDesc] = useState('');
   const [avulsoValue, setAvulsoValue] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [toast, setToast] = useState(null);
   const searchRef = useRef(null);
   const newNameRef = useRef(null);
   const avulsoDescRef = useRef(null);
+
+  const showError = (message) => setToast({ type: 'error', message });
 
   const selected = comandas.find(c => c.id === selectedId) ?? null;
   const selectedTotal = selected
@@ -370,139 +381,116 @@ export default function Comanda({
         .slice(0, 8)
     : [];
 
-  const createComanda = () => {
+  const handleCreateComanda = async () => {
     if (!newName.trim()) return;
-    const c = {
-      id: generateId(),
-      customerName: newName.trim(),
-      openedAt: new Date().toISOString(),
-      items: [],
-    };
-    setComandas(prev => [...prev, c]);
-    navigate(`/comandas/${c.id}`);
-    setNewName('');
-    setShowNewModal(false);
+    setCreating(true);
+    try {
+      const c = await createComandaApi(newName.trim());
+      navigate(`/comandas/${c.id}`);
+      setNewName('');
+      setShowNewModal(false);
+    } catch (err) {
+      showError('Não foi possível criar a comanda: ' + err.message);
+    } finally {
+      setCreating(false);
+    }
   };
 
-  const addAvulso = () => {
+  const handleAddAvulso = async () => {
     const value = parseFloat(avulsoValue);
     if (!avulsoDesc.trim() || !value || value <= 0) return;
-    const item = {
-      productId: `avulso_${Date.now()}`,
-      name: avulsoDesc.trim(),
-      brand: '',
-      unitPrice: value,
-      quantity: 1,
-      subtotal: value,
-      isAvulso: true,
-    };
-    setComandas(prev => prev.map(c =>
-      c.id === selectedId ? { ...c, items: [...c.items, item] } : c
-    ));
-    setAvulsoDesc('');
-    setAvulsoValue('');
-    setShowAvulso(false);
-    setTimeout(() => searchRef.current?.focus(), 50);
-  };
-
-  const addItem = (product) => {
-    setComandas(prev => prev.map(c => {
-      if (c.id !== selectedId) return c;
-      const existing = c.items.find(i => i.productId === product.id);
-      if (existing) {
-        return {
-          ...c,
-          items: c.items.map(i =>
-            i.productId === product.id
-              ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.unitPrice }
-              : i
-          ),
-        };
-      }
-      return {
-        ...c,
-        items: [...c.items, {
-          productId: product.id,
-          name: product.name,
-          brand: product.brand,
-          unitPrice: product.sellPrice,
-          quantity: 1,
-          subtotal: product.sellPrice,
-        }],
-      };
-    }));
-    setSearch('');
-    setTimeout(() => searchRef.current?.focus(), 50);
-  };
-
-  const setItemQty = (productId, qty) => {
-    setComandas(prev => prev.map(c => {
-      if (c.id !== selectedId) return c;
-      if (qty <= 0) return { ...c, items: c.items.filter(i => i.productId !== productId) };
-      return {
-        ...c,
-        items: c.items.map(i =>
-          i.productId === productId
-            ? { ...i, quantity: qty, subtotal: qty * i.unitPrice }
-            : i
-        ),
-      };
-    }));
-  };
-
-  const deleteComanda = (id) => {
-    setComandas(prev => prev.filter(c => c.id !== id));
-    if (selectedId === id) navigate('/comandas');
-    setDeleteConfirmId(null);
-  };
-
-  const closeComanda = ({ method, amountPaid, change }) => {
-    if (!selected || selected.items.length === 0) return;
-    const now = new Date().toISOString();
-
-    const sale = {
-      id: generateId(),
-      date: now,
-      items: selected.items,
-      total: selectedTotal,
-      paymentMethod: method,
-      amountPaid,
-      change,
-      customerId: null,
-      status: 'pago',
-    };
-
-    setSales(prev => [sale, ...prev]);
-
-    const stockItems = selected.items.filter(i => !i.isAvulso);
-    if (stockItems.length > 0) {
-      const newMovs = stockItems.map(item => ({
-        id: generateId(), date: now,
-        productId: item.productId,
-        productName: item.name,
-        type: 'saida',
-        quantity: item.quantity,
-        reason: `Comanda - ${selected.customerName}`,
-      }));
-      setMovements(prev => [...newMovs, ...prev]);
-      setProducts(prev => prev.map(p => {
-        const ci = stockItems.find(i => i.productId === p.id);
-        return ci ? { ...p, quantity: p.quantity - ci.quantity } : p;
-      }));
+    try {
+      await addAvulsoItemApi(selectedId, { name: avulsoDesc.trim(), unitPrice: value });
+      setAvulsoDesc('');
+      setAvulsoValue('');
+      setShowAvulso(false);
+      setTimeout(() => searchRef.current?.focus(), 50);
+    } catch (err) {
+      showError('Não foi possível adicionar o item: ' + err.message);
     }
+  };
 
-    const pd = {
-      ...selected,
-      total: selectedTotal,
-      paymentMethod: method,
-      amountPaid,
-      change,
-      closedAt: now,
-    };
-    setComandas(prev => prev.filter(c => c.id !== selectedId));
-    navigate('/comandas');
-    setShowPayment(false);
-    setPrintData(pd);
+  const handleAddItem = async (product) => {
+    try {
+      await addItemApi(selectedId, product);
+      setSearch('');
+      setTimeout(() => searchRef.current?.focus(), 50);
+    } catch (err) {
+      showError('Não foi possível adicionar o produto: ' + err.message);
+    }
+  };
+
+  const handleSetItemQty = async (itemId, qty) => {
+    try {
+      await setItemQtyApi(selectedId, itemId, qty);
+    } catch (err) {
+      showError('Não foi possível atualizar o item: ' + err.message);
+    }
+  };
+
+  const handleClearItems = async () => {
+    try {
+      await clearItemsApi(selectedId);
+    } catch (err) {
+      showError('Não foi possível limpar os itens: ' + err.message);
+    }
+  };
+
+  const handleDeleteComanda = async (id) => {
+    try {
+      await deleteComandaApi(id);
+      if (selectedId === id) navigate('/comandas');
+    } catch (err) {
+      showError('Não foi possível cancelar a comanda: ' + err.message);
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const handleCloseComanda = async ({ method, amountPaid, change }) => {
+    if (!selected || selected.items.length === 0) return;
+    setClosing(true);
+    try {
+      const sale = await addSale({
+        items: selected.items,
+        total: selectedTotal,
+        paymentMethod: method,
+        amountPaid,
+        change,
+        customerId: null,
+        status: 'pago',
+      });
+
+      const stockItems = selected.items.filter(i => !i.isAvulso);
+      if (stockItems.length > 0) {
+        await decrementForSale(stockItems.map(i => ({ productId: i.productId, quantity: i.quantity })));
+        await addMovements(stockItems.map(item => ({
+          productId: item.productId,
+          productName: item.name,
+          type: 'saida',
+          quantity: item.quantity,
+          reason: `Comanda - ${selected.customerName}`,
+        })));
+      }
+
+      const pd = {
+        ...selected,
+        total: selectedTotal,
+        paymentMethod: method,
+        amountPaid,
+        change,
+        closedAt: sale.date,
+      };
+
+      await deleteComandaApi(selectedId);
+      navigate('/comandas');
+      setShowPayment(false);
+      setPrintData(pd);
+    } catch (err) {
+      showError('Não foi possível fechar a comanda: ' + err.message);
+    } finally {
+      setClosing(false);
+    }
   };
 
   // ── Vista: Lista de comandas ──────────────────────────────────────────
@@ -598,7 +586,7 @@ export default function Comanda({
                 placeholder="Ex: João Silva, Mesa 3..."
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && createComanda()}
+                onKeyDown={e => e.key === 'Enter' && handleCreateComanda()}
               />
               <div className="flex gap-3 mt-4">
                 <button
@@ -608,11 +596,11 @@ export default function Comanda({
                   Cancelar
                 </button>
                 <button
-                  onClick={createComanda}
-                  disabled={!newName.trim()}
+                  onClick={handleCreateComanda}
+                  disabled={!newName.trim() || creating}
                   className="flex-1 py-2.5 rounded-xl bg-gold-500 text-black font-bold hover:bg-gold-400 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Criar Comanda
+                  {creating ? 'Criando...' : 'Criar Comanda'}
                 </button>
               </div>
             </div>
@@ -640,7 +628,7 @@ export default function Comanda({
                   Manter
                 </button>
                 <button
-                  onClick={() => deleteComanda(deleteConfirmId)}
+                  onClick={() => handleDeleteComanda(deleteConfirmId)}
                   className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold transition-colors text-sm"
                 >
                   Cancelar comanda
@@ -657,6 +645,8 @@ export default function Comanda({
             <ReceiptModal data={printData} onClose={() => setPrintData(null)} />
           </>
         )}
+
+        <Toast toast={toast} onClose={() => setToast(null)} />
       </div>
     );
   }
@@ -736,7 +726,7 @@ export default function Comanda({
                   placeholder="Ex: Copo descartável, Gelo..."
                   value={avulsoDesc}
                   onChange={e => setAvulsoDesc(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && avulsoValue && addAvulso()}
+                  onKeyDown={e => e.key === 'Enter' && avulsoValue && handleAddAvulso()}
                 />
               </div>
               <div>
@@ -747,11 +737,11 @@ export default function Comanda({
                   type="number" step="0.01" min="0"
                   value={avulsoValue}
                   onChange={e => setAvulsoValue(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addAvulso()}
+                  onKeyDown={e => e.key === 'Enter' && handleAddAvulso()}
                 />
               </div>
               <button
-                onClick={addAvulso}
+                onClick={handleAddAvulso}
                 disabled={!avulsoDesc.trim() || !avulsoValue || parseFloat(avulsoValue) <= 0}
                 className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
@@ -765,7 +755,7 @@ export default function Comanda({
               {searchResults.map(p => (
                 <button
                   key={p.id}
-                  onClick={() => addItem(p)}
+                  onClick={() => handleAddItem(p)}
                   className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-dark-600 border-b border-dark-400 last:border-0 transition-colors text-left"
                 >
                   <div>
@@ -802,9 +792,7 @@ export default function Comanda({
             </div>
             {selected.items.length > 0 && (
               <button
-                onClick={() => setComandas(prev => prev.map(c =>
-                  c.id === selectedId ? { ...c, items: [] } : c
-                ))}
+                onClick={handleClearItems}
                 className="text-gray-600 hover:text-red-400 text-xs transition-colors flex items-center gap-1"
               >
                 <Trash2 size={13} /> Limpar
@@ -822,7 +810,7 @@ export default function Comanda({
             ) : (
               <div className="p-2 space-y-0.5">
                 {selected.items.map(item => (
-                  <div key={item.productId} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-dark-600/50 transition-colors">
+                  <div key={item.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-dark-600/50 transition-colors">
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-medium leading-tight">
                         {item.name}
@@ -834,14 +822,14 @@ export default function Comanda({
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
-                        onClick={() => setItemQty(item.productId, item.quantity - 1)}
+                        onClick={() => handleSetItemQty(item.id, item.quantity - 1)}
                         className="w-7 h-7 rounded-lg bg-dark-500 text-gray-400 hover:text-white hover:bg-dark-400 flex items-center justify-center transition-colors"
                       >
                         <Minus size={13} />
                       </button>
                       <span className="text-white font-bold w-7 text-center text-sm">{item.quantity}</span>
                       <button
-                        onClick={() => setItemQty(item.productId, item.quantity + 1)}
+                        onClick={() => handleSetItemQty(item.id, item.quantity + 1)}
                         className="w-7 h-7 rounded-lg bg-dark-500 text-gray-400 hover:text-white hover:bg-dark-400 flex items-center justify-center transition-colors"
                       >
                         <Plus size={13} />
@@ -851,7 +839,7 @@ export default function Comanda({
                       <p className="text-gold-400 font-bold text-sm">{formatCurrency(item.subtotal)}</p>
                     </div>
                     <button
-                      onClick={() => setItemQty(item.productId, 0)}
+                      onClick={() => handleSetItemQty(item.id, 0)}
                       className="text-gray-700 hover:text-red-400 transition-colors flex-shrink-0"
                     >
                       <X size={14} />
@@ -902,7 +890,7 @@ export default function Comanda({
                 Manter
               </button>
               <button
-                onClick={() => deleteComanda(deleteConfirmId)}
+                onClick={() => handleDeleteComanda(deleteConfirmId)}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold transition-colors text-sm"
               >
                 Cancelar comanda
@@ -915,10 +903,13 @@ export default function Comanda({
       {showPayment && (
         <PaymentModal
           total={selectedTotal}
-          onConfirm={closeComanda}
+          onConfirm={handleCloseComanda}
           onClose={() => setShowPayment(false)}
+          saving={closing}
         />
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

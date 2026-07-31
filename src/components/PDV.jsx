@@ -5,7 +5,8 @@ import {
   Check, Printer, CreditCard, Banknote, Smartphone,
   User, AlertTriangle, Clock, Tag
 } from 'lucide-react';
-import { generateId, formatCurrency, PAYMENT_METHODS, getPaymentLabel } from '../utils/helpers';
+import { formatCurrency, PAYMENT_METHODS, getPaymentLabel } from '../utils/helpers';
+import { Toast } from './Toast';
 
 // Estilos inline para garantir impressão correta independente de Tailwind
 const rs = {
@@ -221,7 +222,7 @@ function Receipt({ sale, clients, onClose }) {
   );
 }
 
-function PaymentModal({ total, clients, onConfirm, onClose }) {
+function PaymentModal({ total, clients, onConfirm, onClose, saving }) {
   const [method, setMethod] = useState('dinheiro');
   const [amountPaid, setAmountPaid] = useState('');
   const [clientId, setClientId] = useState('');
@@ -231,11 +232,11 @@ function PaymentModal({ total, clients, onConfirm, onClose }) {
   const paid = parseFloat(amountPaid) || 0;
   const change = isCash && paid >= total ? paid - total : 0;
 
-  const canPay = isFiado
+  const canPay = (isFiado
     ? !!clientId
     : isCash
     ? paid >= total
-    : true;
+    : true) && !saving;
 
   const quickAmounts = [...new Set([
     total,
@@ -412,7 +413,7 @@ function PaymentModal({ total, clients, onConfirm, onClose }) {
                 : 'bg-gold-500 text-black hover:bg-gold-400'}`}
           >
             <Check size={22} />
-            {isFiado ? 'Registrar Fiado' : 'Confirmar Venda'}
+            {saving ? 'Salvando...' : (isFiado ? 'Registrar Fiado' : 'Confirmar Venda')}
           </button>
         </div>
       </div>
@@ -420,7 +421,7 @@ function PaymentModal({ total, clients, onConfirm, onClose }) {
   );
 }
 
-export default function PDV({ products, setProducts, sales, setSales, clients, movements, setMovements }) {
+export default function PDV({ products, clients, sales, addSale, decrementForSale, addMovements }) {
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
@@ -428,6 +429,8 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
   const [showAvulso, setShowAvulso] = useState(false);
   const [avulsoDesc, setAvulsoDesc] = useState('');
   const [avulsoValue, setAvulsoValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
   const searchRef = useRef(null);
   const avulsoDescRef = useRef(null);
 
@@ -493,40 +496,38 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
   const cartTotal = cart.reduce((s, i) => s + i.subtotal, 0);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
-  const handleConfirm = ({ method, amountPaid, change, clientId, status }) => {
-    const now = new Date().toISOString();
-    const sale = {
-      id: generateId(), date: now,
-      items: cart, total: cartTotal,
-      paymentMethod: method, amountPaid, change,
-      customerId: clientId,
-      status,
-    };
+  const handleConfirm = async ({ method, amountPaid, change, clientId, status }) => {
+    setSaving(true);
+    try {
+      const sale = await addSale({
+        items: cart, total: cartTotal,
+        paymentMethod: method, amountPaid, change,
+        customerId: clientId,
+        status,
+      });
 
-    setSales(prev => [sale, ...prev]);
+      // Itens avulsos não afetam estoque nem movimentações
+      const stockItems = cart.filter(i => !i.isAvulso);
+      if (stockItems.length > 0) {
+        await decrementForSale(stockItems.map(i => ({ productId: i.productId, quantity: i.quantity })));
+        await addMovements(stockItems.map(item => ({
+          productId: item.productId, productName: item.name,
+          type: 'saida', quantity: item.quantity,
+          reason: status === 'pendente'
+            ? `Fiado #${sale.id.slice(-6).toUpperCase()}`
+            : `Venda #${sale.id.slice(-6).toUpperCase()}`,
+        })));
+      }
 
-    // Itens avulsos não afetam estoque nem movimentações
-    const stockItems = cart.filter(i => !i.isAvulso);
-    if (stockItems.length > 0) {
-      const newMovs = stockItems.map(item => ({
-        id: generateId(), date: now,
-        productId: item.productId, productName: item.name,
-        type: 'saida', quantity: item.quantity,
-        reason: status === 'pendente'
-          ? `Fiado #${sale.id.slice(-6).toUpperCase()}`
-          : `Venda #${sale.id.slice(-6).toUpperCase()}`,
-      }));
-      setMovements(prev => [...newMovs, ...prev]);
-      setProducts(prev => prev.map(p => {
-        const ci = stockItems.find(i => i.productId === p.id);
-        return ci ? { ...p, quantity: p.quantity - ci.quantity } : p;
-      }));
+      setLastSale(sale);
+      setCart([]);
+      setSearch('');
+      setShowPayment(false);
+    } catch (err) {
+      setToast({ type: 'error', message: 'Não foi possível registrar a venda: ' + err.message });
+    } finally {
+      setSaving(false);
     }
-
-    setLastSale(sale);
-    setCart([]);
-    setSearch('');
-    setShowPayment(false);
   };
 
   const todaySales = sales.filter(s => {
@@ -752,6 +753,7 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
           clients={clients}
           onConfirm={handleConfirm}
           onClose={() => setShowPayment(false)}
+          saving={saving}
         />
       )}
 
@@ -762,6 +764,8 @@ export default function PDV({ products, setProducts, sales, setSales, clients, m
           onClose={() => setLastSale(null)}
         />
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

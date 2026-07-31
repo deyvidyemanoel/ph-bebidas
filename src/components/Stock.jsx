@@ -5,9 +5,10 @@ import {
   AlertTriangle, Package, X, History
 } from 'lucide-react';
 import {
-  generateId, formatCurrency, formatDateTime,
+  formatCurrency, formatDateTime,
   CATEGORIES, UNITS, getCategoryLabel
 } from '../utils/helpers';
+import { Toast } from './Toast';
 
 function ProductModal({ product, onSave, onClose }) {
   const [form, setForm] = useState(product || {
@@ -15,6 +16,7 @@ function ProductModal({ product, onSave, onClose }) {
     costPrice: '', sellPrice: '', quantity: '', minStock: '10', unit: 'unidade',
   });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const validate = () => {
     const e = {};
@@ -26,18 +28,22 @@ function ProductModal({ product, onSave, onClose }) {
     return e;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    onSave({
-      ...form,
-      id: form.id || generateId(),
-      costPrice: parseFloat(form.costPrice),
-      sellPrice: parseFloat(form.sellPrice),
-      quantity: parseInt(form.quantity),
-      minStock: parseInt(form.minStock) || 10,
-    });
+    setSaving(true);
+    try {
+      await onSave({
+        ...form,
+        costPrice: parseFloat(form.costPrice),
+        sellPrice: parseFloat(form.sellPrice),
+        quantity: parseInt(form.quantity),
+        minStock: parseInt(form.minStock) || 10,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const ic = 'w-full bg-dark-600 border border-dark-300 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-gold-500 transition-colors text-sm';
@@ -108,9 +114,9 @@ function ProductModal({ product, onSave, onClose }) {
           )}
 
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors">Cancelar</button>
-            <button type="submit" className="flex-1 py-2.5 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors">
-              {product ? 'Salvar' : 'Cadastrar'}
+            <button type="button" onClick={onClose} disabled={saving} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors disabled:opacity-50">Cancelar</button>
+            <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              {saving ? 'Salvando...' : (product ? 'Salvar' : 'Cadastrar')}
             </button>
           </div>
         </form>
@@ -122,14 +128,20 @@ function ProductModal({ product, onSave, onClose }) {
 function MovementModal({ product, type, onSave, onClose }) {
   const [quantity, setQuantity] = useState('');
   const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
   const isOut = type === 'saida';
   const qty = parseInt(quantity);
   const invalid = isOut && qty > product.quantity;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!qty || qty <= 0 || invalid) return;
-    onSave({ quantity: qty, reason: reason.trim() || (isOut ? 'Saída manual' : 'Entrada/Reposição') });
+    setSaving(true);
+    try {
+      await onSave({ quantity: qty, reason: reason.trim() || (isOut ? 'Saída manual' : 'Entrada/Reposição') });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -166,14 +178,14 @@ function MovementModal({ product, type, onSave, onClose }) {
             />
           </div>
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white">Cancelar</button>
+            <button type="button" onClick={onClose} disabled={saving} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white disabled:opacity-50">Cancelar</button>
             <button
               type="submit"
-              disabled={!qty || qty <= 0 || invalid}
+              disabled={!qty || qty <= 0 || invalid || saving}
               className={`flex-1 py-2.5 font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed
                 ${isOut ? 'bg-red-500 text-white hover:bg-red-400' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
             >
-              Confirmar
+              {saving ? 'Confirmando...' : 'Confirmar'}
             </button>
           </div>
         </form>
@@ -197,7 +209,7 @@ function DeleteModal({ onConfirm, onClose }) {
   );
 }
 
-export default function Stock({ products, setProducts, movements, setMovements }) {
+export default function Stock({ products, movements, addProduct, updateProduct, deleteProduct, adjustStock, addMovement }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -207,6 +219,9 @@ export default function Stock({ products, setProducts, movements, setMovements }
   const [editing, setEditing] = useState(null);
   const [movModal, setMovModal] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showError = (message) => setToast({ type: 'error', message });
 
   const isNewRoute = location.pathname === '/estoque/novo';
 
@@ -227,21 +242,27 @@ export default function Stock({ products, setProducts, movements, setMovements }
     return matchQ && matchC;
   });
 
-  const handleSave = (data) => {
-    if (editing) setProducts(prev => prev.map(p => p.id === data.id ? data : p));
-    else setProducts(prev => [...prev, data]);
-    closeProductModal();
+  const handleSave = async (data) => {
+    try {
+      if (editing) await updateProduct({ ...editing, ...data });
+      else await addProduct(data);
+      closeProductModal();
+    } catch (err) {
+      showError('Não foi possível salvar o produto: ' + err.message);
+    }
   };
 
-  const handleMovement = (product, type, { quantity, reason }) => {
-    const newQty = type === 'entrada' ? product.quantity + quantity : product.quantity - quantity;
-    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, quantity: newQty } : p));
-    setMovements(prev => [{
-      id: generateId(), date: new Date().toISOString(),
-      productId: product.id, productName: product.name,
-      type, quantity, reason,
-    }, ...prev]);
-    setMovModal(null);
+  const handleMovement = async (product, type, { quantity, reason }) => {
+    try {
+      await adjustStock(product, type, quantity);
+      await addMovement({
+        productId: product.id, productName: product.name,
+        type, quantity, reason,
+      });
+      setMovModal(null);
+    } catch (err) {
+      showError('Não foi possível registrar a movimentação: ' + err.message);
+    }
   };
 
   const lowCount = products.filter(p => p.quantity <= p.minStock).length;
@@ -408,7 +429,22 @@ export default function Stock({ products, setProducts, movements, setMovements }
 
       {showProduct && <ProductModal product={editing} onSave={handleSave} onClose={closeProductModal} />}
       {movModal && <MovementModal product={movModal.product} type={movModal.type} onSave={d => handleMovement(movModal.product, movModal.type, d)} onClose={() => setMovModal(null)} />}
-      {delConfirm && <DeleteModal onConfirm={() => { setProducts(p => p.filter(x => x.id !== delConfirm)); setDelConfirm(null); }} onClose={() => setDelConfirm(null)} />}
+      {delConfirm && (
+        <DeleteModal
+          onConfirm={async () => {
+            try {
+              await deleteProduct(delConfirm);
+            } catch (err) {
+              showError('Não foi possível excluir o produto: ' + err.message);
+            } finally {
+              setDelConfirm(null);
+            }
+          }}
+          onClose={() => setDelConfirm(null)}
+        />
+      )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

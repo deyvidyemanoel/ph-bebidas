@@ -7,6 +7,7 @@ import {
   formatCurrency, formatDateTime, isToday,
   isThisWeek, isThisMonth, getPaymentLabel
 } from '../utils/helpers';
+import { Toast } from './Toast';
 
 function SaleRow({ sale, products, onDeleteRequest }) {
   const [expanded, setExpanded] = useState(false);
@@ -85,9 +86,11 @@ function SaleRow({ sale, products, onDeleteRequest }) {
   );
 }
 
-export default function Reports({ products, sales, setSales }) {
+export default function Reports({ products, sales, deleteSale }) {
   const [period, setPeriod] = useState('today');
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const filterSales = () => {
     switch (period) {
@@ -345,23 +348,34 @@ export default function Reports({ products, sales, setSales }) {
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 rounded-xl border border-dark-300 text-gray-400 hover:text-white hover:border-dark-200 transition-colors text-sm font-medium"
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl border border-dark-300 text-gray-400 hover:text-white hover:border-dark-200 transition-colors text-sm font-medium disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
-                onClick={() => {
-                  setSales(prev => prev.filter(s => s.id !== deleteTarget.id));
-                  setDeleteTarget(null);
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteSale(deleteTarget.id);
+                    setDeleteTarget(null);
+                  } catch (err) {
+                    setToast({ type: 'error', message: 'Não foi possível apagar a venda: ' + err.message });
+                  } finally {
+                    setDeleting(false);
+                  }
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-400 transition-colors text-sm font-bold"
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-400 transition-colors text-sm font-bold disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Confirmar
+                {deleting ? 'Apagando...' : 'Confirmar'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

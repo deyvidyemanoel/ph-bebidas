@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
 import Layout from './components/Layout';
 import Stock from './components/Stock';
 import PDV from './components/PDV';
@@ -7,36 +8,101 @@ import Reports from './components/Reports';
 import Clients from './components/Clients';
 import Comanda from './components/Comanda';
 import Settings from './components/Settings';
+import Employees from './components/Employees';
 import Login from './components/Login';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import { INITIAL_PRODUCTS } from './utils/helpers';
+import { useAuth } from './contexts/AuthContext';
+import { useProducts } from './hooks/useProducts';
+import { useClients } from './hooks/useClients';
+import { useMovements } from './hooks/useMovements';
+import { useSales } from './hooks/useSales';
+import { useComandas } from './hooks/useComandas';
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-dark-800 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3 text-gray-400">
+        <RefreshCw size={28} className="animate-spin text-gold-400" />
+        <p className="text-sm">Carregando dados...</p>
+      </div>
+    </div>
+  );
+}
+
+function ErrorScreen({ message, onRetry }) {
+  return (
+    <div className="min-h-screen bg-dark-800 flex items-center justify-center p-4">
+      <div className="bg-dark-700 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full text-center">
+        <AlertTriangle size={32} className="text-red-400 mx-auto mb-3" />
+        <p className="text-white font-semibold mb-1">Não foi possível carregar os dados</p>
+        <p className="text-gray-500 text-sm mb-5">{message}</p>
+        <button
+          onClick={onRetry}
+          className="w-full py-2.5 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
-  // Todos os hooks devem ser chamados antes de qualquer return condicional
-  const [isLoggedIn, setIsLoggedIn] = useLocalStorage('ph_auth', false);
-  const [products, setProducts] = useLocalStorage('ph_products', INITIAL_PRODUCTS);
-  const [sales, setSales] = useLocalStorage('ph_sales', []);
-  const [clients, setClients] = useLocalStorage('ph_clients', []);
-  const [movements, setMovements] = useLocalStorage('ph_movements', []);
-  const [comandas, setComandas] = useLocalStorage('ph_comandas', []);
+  const { session, employee, loading: authLoading } = useAuth();
 
-  if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />;
+  if (authLoading) return <LoadingScreen />;
+  if (!session || !employee) return <Login />;
+
+  // Só monta a partir daqui (com os hooks de dado, que já dependem de RLS
+  // autenticado) depois que a sessão e o perfil do funcionário existem.
+  return <AuthenticatedApp employee={employee} />;
+}
+
+function AuthenticatedApp({ employee }) {
+  const { logout } = useAuth();
+  const productsApi = useProducts();
+  const clientsApi = useClients();
+  const movementsApi = useMovements();
+  const salesApi = useSales();
+  const comandasApi = useComandas();
+
+  const loading = productsApi.loading || clientsApi.loading || movementsApi.loading || salesApi.loading || comandasApi.loading;
+  const firstError = productsApi.error || clientsApi.error || movementsApi.error || salesApi.error || comandasApi.error;
+
+  if (loading) return <LoadingScreen />;
+  if (firstError) {
+    return (
+      <ErrorScreen
+        message={firstError}
+        onRetry={() => {
+          productsApi.refetch();
+          clientsApi.refetch();
+          movementsApi.refetch();
+          salesApi.refetch();
+          comandasApi.refetch();
+        }}
+      />
+    );
   }
 
-  const handleReset = (scope) => {
+  const products = productsApi.products;
+  const sales = salesApi.sales;
+  const clients = clientsApi.clients;
+  const movements = movementsApi.movements;
+
+  const handleReset = async (scope) => {
     if (scope === 'all') {
-      setSales([]);
-      setClients([]);
-      setMovements([]);
-      setProducts(INITIAL_PRODUCTS);
+      await Promise.all([
+        salesApi.clearAll(),
+        clientsApi.clearAll(),
+        movementsApi.clearAll(),
+        productsApi.resetToInitial(),
+      ]);
     } else if (scope === 'sales') {
-      setSales([]);
+      await salesApi.clearAll();
     } else if (scope === 'stock') {
-      setProducts(INITIAL_PRODUCTS);
-      setMovements([]);
+      await Promise.all([productsApi.resetToInitial(), movementsApi.clearAll()]);
     } else if (scope === 'clients') {
-      setClients([]);
+      await clientsApi.clearAll();
     }
   };
 
@@ -44,36 +110,54 @@ export default function App() {
   // já que apenas uma rota fica montada por vez.
   const pdvElement = (
     <PDV
-      products={products} setProducts={setProducts}
-      sales={sales} setSales={setSales}
-      clients={clients}
-      movements={movements} setMovements={setMovements}
+      products={products} clients={clients} sales={sales}
+      addSale={salesApi.addSale}
+      decrementForSale={productsApi.decrementForSale}
+      addMovements={movementsApi.addMovements}
     />
   );
 
   const comandaElement = (
     <Comanda
-      products={products} setProducts={setProducts}
-      sales={sales} setSales={setSales}
-      movements={movements} setMovements={setMovements}
-      comandas={comandas} setComandas={setComandas}
+      products={products}
+      comandas={comandasApi.comandas}
+      createComanda={comandasApi.createComanda}
+      addItem={comandasApi.addItem}
+      addAvulsoItem={comandasApi.addAvulsoItem}
+      setItemQty={comandasApi.setItemQty}
+      clearItems={comandasApi.clearItems}
+      deleteComanda={comandasApi.deleteComanda}
+      addSale={salesApi.addSale}
+      decrementForSale={productsApi.decrementForSale}
+      addMovements={movementsApi.addMovements}
     />
   );
 
   const stockElement = (
     <Stock
-      products={products} setProducts={setProducts}
-      movements={movements} setMovements={setMovements}
+      products={products}
+      movements={movements}
+      addProduct={productsApi.addProduct}
+      updateProduct={productsApi.updateProduct}
+      deleteProduct={productsApi.deleteProduct}
+      adjustStock={productsApi.adjustStock}
+      addMovement={movementsApi.addMovement}
     />
   );
 
   const clientsElement = (
-    <Clients clients={clients} setClients={setClients} sales={sales} setSales={setSales} />
+    <Clients
+      clients={clients} sales={sales}
+      addClient={clientsApi.addClient}
+      updateClient={clientsApi.updateClient}
+      deleteClient={clientsApi.deleteClient}
+      markPaid={salesApi.markPaid}
+    />
   );
 
   return (
     <Routes>
-      <Route element={<Layout onLogout={() => setIsLoggedIn(false)} />}>
+      <Route element={<Layout onLogout={logout} isAdmin={employee.isAdmin} />}>
         <Route path="/" element={pdvElement} />
         <Route path="/pdv" element={pdvElement} />
 
@@ -86,19 +170,25 @@ export default function App() {
         <Route path="/clientes" element={clientsElement} />
         <Route path="/clientes/:id" element={clientsElement} />
 
-        <Route path="/relatorios" element={<Reports products={products} sales={sales} setSales={setSales} />} />
+        <Route path="/relatorios" element={<Reports products={products} sales={sales} deleteSale={salesApi.deleteSale} />} />
 
         <Route
           path="/configuracoes"
           element={
             <Settings
-              products={products} setProducts={setProducts}
-              sales={sales} setSales={setSales}
-              clients={clients} setClients={setClients}
-              movements={movements} setMovements={setMovements}
+              products={products} sales={sales} clients={clients} movements={movements}
+              bulkReplaceProducts={productsApi.bulkReplace}
+              bulkReplaceClients={clientsApi.bulkReplace}
+              bulkReplaceSales={salesApi.bulkReplace}
+              bulkReplaceMovements={movementsApi.bulkReplace}
               onReset={handleReset}
             />
           }
+        />
+
+        <Route
+          path="/funcionarios"
+          element={employee.isAdmin ? <Employees /> : <Navigate to="/" replace />}
         />
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X, ClipboardList } from 'lucide-react';
+import { Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X, ClipboardList, ShieldCheck } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/pdv', label: 'PDV', icon: ShoppingCart, match: (p) => p === '/' || p.startsWith('/pdv') },
@@ -10,9 +10,10 @@ const NAV_ITEMS = [
   { to: '/relatorios', label: 'Relatórios', icon: BarChart2, match: (p) => p.startsWith('/relatorios') },
 ];
 
-export default function Sidebar({ isOpen, onToggle, onLogout }) {
+export default function Sidebar({ isOpen, onToggle, onLogout, isAdmin }) {
   const { pathname } = useLocation();
   const configActive = pathname.startsWith('/configuracoes');
+  const employeesActive = pathname.startsWith('/funcionarios');
 
   const closeOnMobile = () => {
     if (window.innerWidth < 1024) onToggle();
@@ -75,6 +76,25 @@ export default function Sidebar({ isOpen, onToggle, onLogout }) {
         </nav>
 
         <div className="px-4 pb-4 border-t border-dark-400 pt-3 space-y-1">
+          {isAdmin && (
+            <Link
+              to="/funcionarios"
+              onClick={closeOnMobile}
+              className={`
+                w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200
+                ${employeesActive
+                  ? 'bg-gold-500/15 text-gold-400 border border-gold-500/25 shadow-sm'
+                  : 'text-gray-500 hover:text-white hover:bg-dark-500 border border-transparent'}
+              `}
+            >
+              <ShieldCheck size={19} />
+              <span className="font-medium">Funcionários</span>
+              {employeesActive && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-gold-400" />
+              )}
+            </Link>
+          )}
+
           <Link
             to="/configuracoes"
             onClick={closeOnMobile}
