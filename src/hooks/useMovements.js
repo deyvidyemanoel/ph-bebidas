@@ -53,6 +53,13 @@ export function useMovements() {
     return saved;
   }, [movements]);
 
+  const deleteMovement = useCallback(async (id) => {
+    const prevSnapshot = movements;
+    setMovements(prev => prev.filter(m => m.id !== id));
+    const { error: err } = await supabase.from('movimentacoes').delete().eq('id', id);
+    if (err) { setMovements(prevSnapshot); throw err; }
+  }, [movements]);
+
   const clearAll = useCallback(async () => {
     const prevSnapshot = movements;
     setMovements([]);
@@ -78,5 +85,5 @@ export function useMovements() {
     }
   }, [movements]);
 
-  return { movements, loading, error, refetch: fetchAll, addMovement, addMovements, clearAll, bulkReplace };
+  return { movements, loading, error, refetch: fetchAll, addMovement, addMovements, deleteMovement, clearAll, bulkReplace };
 }

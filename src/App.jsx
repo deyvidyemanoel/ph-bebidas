@@ -142,6 +142,7 @@ function AuthenticatedApp({ employee }) {
       deleteProduct={productsApi.deleteProduct}
       adjustStock={productsApi.adjustStock}
       addMovement={movementsApi.addMovement}
+      deleteMovement={movementsApi.deleteMovement}
     />
   );
 

@@ -194,22 +194,35 @@ function MovementModal({ product, type, onSave, onClose }) {
   );
 }
 
-function DeleteModal({ onConfirm, onClose }) {
+function DeleteModal({ title = 'Excluir Produto', message = 'Tem certeza? Esta ação não pode ser desfeita.', onConfirm, onClose }) {
+  const [deleting, setDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
       <div className="bg-dark-700 border border-dark-400 rounded-2xl p-6 max-w-sm w-full">
-        <h3 className="text-white font-bold text-lg mb-2">Excluir Produto</h3>
-        <p className="text-gray-400 text-sm mb-6">Tem certeza? Esta ação não pode ser desfeita.</p>
+        <h3 className="text-white font-bold text-lg mb-2">{title}</h3>
+        <p className="text-gray-400 text-sm mb-6">{message}</p>
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white">Cancelar</button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-500 text-white font-bold rounded-xl hover:bg-red-400">Excluir</button>
+          <button onClick={onClose} disabled={deleting} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white disabled:opacity-50">Cancelar</button>
+          <button onClick={handleConfirm} disabled={deleting} className="flex-1 py-2.5 bg-red-500 text-white font-bold rounded-xl hover:bg-red-400 disabled:opacity-60 disabled:cursor-not-allowed">
+            {deleting ? 'Excluindo...' : 'Excluir'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-export default function Stock({ products, movements, addProduct, updateProduct, deleteProduct, adjustStock, addMovement }) {
+export default function Stock({ products, movements, addProduct, updateProduct, deleteProduct, adjustStock, addMovement, deleteMovement }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -219,6 +232,7 @@ export default function Stock({ products, movements, addProduct, updateProduct, 
   const [editing, setEditing] = useState(null);
   const [movModal, setMovModal] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
+  const [delMovConfirm, setDelMovConfirm] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showError = (message) => setToast({ type: 'error', message });
@@ -263,6 +277,19 @@ export default function Stock({ products, movements, addProduct, updateProduct, 
       setMovModal(null);
     } catch (err) {
       showError('Não foi possível registrar a movimentação: ' + err.message);
+    }
+  };
+
+  // NOTA: se o `reason` contiver "Fiado #...", esta movimentação está vinculada a uma
+  // venda fiado pendente do cliente. Excluir aqui remove só o registro de estoque —
+  // a pendência do fiado em si (tabela de vendas/cliente) não é afetada.
+  const handleDeleteMovement = async (id) => {
+    try {
+      await deleteMovement(id);
+    } catch (err) {
+      showError('Não foi possível excluir a movimentação: ' + err.message);
+    } finally {
+      setDelMovConfirm(null);
     }
   };
 
@@ -397,9 +424,9 @@ export default function Stock({ products, movements, addProduct, updateProduct, 
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-dark-400">
-                    {['Data/Hora', 'Produto', 'Tipo', 'Qtd', 'Motivo'].map((h, i) => (
+                    {['Data/Hora', 'Produto', 'Tipo', 'Qtd', 'Motivo', 'Ações'].map((h, i) => (
                       <th key={h} className={`text-gray-600 text-xs px-4 py-3 font-medium uppercase tracking-wide
-                        ${i < 2 ? 'text-left' : i === 2 || i === 3 ? 'text-center' : 'text-left'}
+                        ${i < 2 ? 'text-left' : i === 2 || i === 3 || i === 5 ? 'text-center' : 'text-left'}
                         ${i === 4 ? 'hidden md:table-cell' : ''}`}>
                         {h}
                       </th>
@@ -419,6 +446,9 @@ export default function Stock({ products, movements, addProduct, updateProduct, 
                       </td>
                       <td className="px-4 py-3 text-center text-white font-bold">{m.quantity}</td>
                       <td className="px-4 py-3 text-gray-400 text-sm hidden md:table-cell">{m.reason}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => setDelMovConfirm(m.id)} title="Excluir" className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"><Trash2 size={14} /></button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -442,6 +472,14 @@ export default function Stock({ products, movements, addProduct, updateProduct, 
             }
           }}
           onClose={() => setDelConfirm(null)}
+        />
+      )}
+      {delMovConfirm && (
+        <DeleteModal
+          title="Excluir Movimentação"
+          message="Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita."
+          onConfirm={() => handleDeleteMovement(delMovConfirm)}
+          onClose={() => setDelMovConfirm(null)}
         />
       )}
 
