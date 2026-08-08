@@ -465,6 +465,7 @@ export default function Comanda({
       if (stockItems.length > 0) {
         await decrementForSale(stockItems.map(i => ({ productId: i.productId, quantity: i.quantity })));
         await addMovements(stockItems.map(item => ({
+          date: new Date().toISOString(),
           productId: item.productId,
           productName: item.name,
           type: 'saida',

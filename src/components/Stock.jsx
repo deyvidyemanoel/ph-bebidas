@@ -256,6 +256,7 @@ export default function Stock({ products, movements, addProduct, updateProduct, 
     try {
       await adjustStock(product, type, quantity);
       await addMovement({
+        date: new Date().toISOString(),
         productId: product.id, productName: product.name,
         type, quantity, reason,
       });
