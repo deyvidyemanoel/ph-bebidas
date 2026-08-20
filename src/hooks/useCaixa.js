@@ -32,10 +32,10 @@ export function useCaixa() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const abrirCaixa = useCallback(async (funcionarioId) => {
+  const abrirCaixa = useCallback(async (valorInicial, funcionarioId) => {
     const { data, error: err } = await supabase
       .from('caixa')
-      .insert({ aberto_por: funcionarioId })
+      .insert({ valor_inicial: valorInicial, aberto_por: funcionarioId })
       .select(SELECT)
       .single();
     if (err) throw err;

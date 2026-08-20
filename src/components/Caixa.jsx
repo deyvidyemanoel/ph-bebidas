@@ -46,7 +46,53 @@ function PaymentSummary({ payMap, total }) {
   );
 }
 
-function FecharCaixaModal({ payMap, total, dinheiro, onConfirm, onClose }) {
+function AbrirCaixaModal({ onConfirm, onClose }) {
+  const [valor, setValor] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleConfirm = async () => {
+    if (valor === '' || isNaN(valor) || parseFloat(valor) < 0) { setError('Valor inválido'); return; }
+    setSaving(true);
+    try {
+      await onConfirm(parseFloat(valor));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
+      <div className="bg-dark-700 border border-dark-400 rounded-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-400">
+          <h3 className="text-white font-bold">Abrir Caixa</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-gray-500 text-xs mb-1.5 font-medium uppercase tracking-wide">Valor inicial (fundo de troco)</label>
+            <input
+              type="number" step="0.01" min="0" autoFocus
+              className="w-full bg-dark-600 border border-dark-300 rounded-xl px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-gold-500 transition-colors text-lg"
+              placeholder="0,00"
+              value={valor}
+              onChange={e => { setValor(e.target.value); setError(''); }}
+            />
+            {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={saving} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors disabled:opacity-50">Cancelar</button>
+            <button onClick={handleConfirm} disabled={saving} className="flex-1 py-2.5 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+              <Unlock size={16} /> {saving ? 'Abrindo...' : 'Abrir Caixa'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FecharCaixaModal({ payMap, total, valorEsperado, onConfirm, onClose }) {
   const [saving, setSaving] = useState(false);
 
   const handleConfirm = async () => {
@@ -76,7 +122,7 @@ function FecharCaixaModal({ payMap, total, dinheiro, onConfirm, onClose }) {
           <div className="bg-dark-600 rounded-xl p-4">
             <div className="flex justify-between text-sm font-bold">
               <span className="text-gray-300">Valor esperado em caixa (Dinheiro)</span>
-              <span className="text-gold-400">{formatCurrency(dinheiro)}</span>
+              <span className="text-gold-400">{formatCurrency(valorEsperado)}</span>
             </div>
           </div>
 
@@ -93,7 +139,7 @@ function FecharCaixaModal({ payMap, total, dinheiro, onConfirm, onClose }) {
 }
 
 export default function Caixa({ caixaAberto, historico, abrirCaixa, fecharCaixa, deleteCaixa, employee, sales }) {
-  const [abrindo, setAbrindo] = useState(false);
+  const [showAbrir, setShowAbrir] = useState(false);
   const [showFechar, setShowFechar] = useState(false);
   const [delConfirm, setDelConfirm] = useState(null);
   const [toast, setToast] = useState(null);
@@ -112,21 +158,20 @@ export default function Caixa({ caixaAberto, historico, abrirCaixa, fecharCaixa,
 
   const salesDoCaixaAberto = caixaAberto ? sales.filter(s => s.caixaId === caixaAberto.id) : [];
   const { payMap, total, dinheiro } = paymentBreakdown(salesDoCaixaAberto);
+  const valorEsperado = (caixaAberto?.valorInicial || 0) + dinheiro;
 
-  const handleAbrir = async () => {
-    setAbrindo(true);
+  const handleAbrir = async (valorInicial) => {
     try {
-      await abrirCaixa(employee.id);
+      await abrirCaixa(valorInicial, employee.id);
+      setShowAbrir(false);
     } catch (err) {
       showError('Não foi possível abrir o caixa: ' + err.message);
-    } finally {
-      setAbrindo(false);
     }
   };
 
   const handleFechar = async () => {
     try {
-      await fecharCaixa(caixaAberto.id, dinheiro, employee.id);
+      await fecharCaixa(caixaAberto.id, valorEsperado, employee.id);
       setShowFechar(false);
     } catch (err) {
       showError('Não foi possível fechar o caixa: ' + err.message);
@@ -148,6 +193,7 @@ export default function Caixa({ caixaAberto, historico, abrirCaixa, fecharCaixa,
             </div>
             <div className="flex-1">
               <p className="text-emerald-400 font-bold text-lg">Caixa aberto às {formatDateTime(caixaAberto.abertoEm).split(' ')[1]}</p>
+              <p className="text-gray-400 text-sm">Valor inicial: <span className="text-white font-semibold">{formatCurrency(caixaAberto.valorInicial)}</span></p>
               {caixaAberto.abertoPorNome && <p className="text-gray-600 text-xs mt-0.5">Aberto por {caixaAberto.abertoPorNome}</p>}
             </div>
             <button
@@ -167,11 +213,10 @@ export default function Caixa({ caixaAberto, historico, abrirCaixa, fecharCaixa,
               <p className="text-gray-500 text-sm">Nenhum caixa aberto no momento</p>
             </div>
             <button
-              onClick={handleAbrir}
-              disabled={abrindo}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={() => setShowAbrir(true)}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-gold-500 text-black font-bold rounded-xl hover:bg-gold-400 transition-colors"
             >
-              <Unlock size={17} /> {abrindo ? 'Abrindo...' : 'Abrir Caixa'}
+              <Unlock size={17} /> Abrir Caixa
             </button>
           </div>
         )}
@@ -205,8 +250,8 @@ export default function Caixa({ caixaAberto, historico, abrirCaixa, fecharCaixa,
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-dark-400">
-                    {['Abertura', 'Fechamento', 'Total Vendido', 'Ações'].map((h, i) => (
-                      <th key={h} className={`text-gray-600 text-xs px-4 py-3 font-medium uppercase tracking-wide ${i === 3 ? 'text-center' : 'text-left'}`}>{h}</th>
+                    {['Abertura', 'Fechamento', 'Valor Inicial', 'Total Vendido', 'Ações'].map((h, i, arr) => (
+                      <th key={h} className={`text-gray-600 text-xs px-4 py-3 font-medium uppercase tracking-wide ${i === arr.length - 1 ? 'text-center' : 'text-left'}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -217,6 +262,7 @@ export default function Caixa({ caixaAberto, historico, abrirCaixa, fecharCaixa,
                       <tr key={c.id} className="border-b border-dark-400 last:border-0 hover:bg-dark-600/40">
                         <td className="px-4 py-3 text-gray-400 text-sm whitespace-nowrap">{formatDateTime(c.abertoEm)}</td>
                         <td className="px-4 py-3 text-gray-400 text-sm whitespace-nowrap">{c.fechadoEm ? formatDateTime(c.fechadoEm) : '—'}</td>
+                        <td className="px-4 py-3 text-white text-sm">{formatCurrency(c.valorInicial)}</td>
                         <td className="px-4 py-3 text-gold-400 text-sm font-semibold">{formatCurrency(totalVendido)}</td>
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => setDelConfirm(c.id)} title="Excluir" className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"><Trash2 size={14} /></button>
@@ -231,11 +277,18 @@ export default function Caixa({ caixaAberto, historico, abrirCaixa, fecharCaixa,
         </div>
       </div>
 
+      {showAbrir && (
+        <AbrirCaixaModal
+          onConfirm={handleAbrir}
+          onClose={() => setShowAbrir(false)}
+        />
+      )}
+
       {showFechar && (
         <FecharCaixaModal
           payMap={payMap}
           total={total}
-          dinheiro={dinheiro}
+          valorEsperado={valorEsperado}
           onConfirm={handleFechar}
           onClose={() => setShowFechar(false)}
         />
