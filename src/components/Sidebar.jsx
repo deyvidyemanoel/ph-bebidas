@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X, ClipboardList, ShieldCheck } from 'lucide-react';
+import { Package, ShoppingCart, BarChart2, Users, Settings, LogOut, X, ClipboardList, ShieldCheck, Wallet } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/pdv', label: 'PDV', icon: ShoppingCart, match: (p) => p === '/' || p.startsWith('/pdv') },
   { to: '/comandas', label: 'Comandas', icon: ClipboardList, match: (p) => p.startsWith('/comandas') },
+  { to: '/caixa', label: 'Caixa', icon: Wallet, match: (p) => p.startsWith('/caixa') },
   { to: '/estoque', label: 'Estoque', icon: Package, match: (p) => p.startsWith('/estoque') },
   { to: '/clientes', label: 'Clientes', icon: Users, match: (p) => p.startsWith('/clientes') },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart2, match: (p) => p.startsWith('/relatorios') },

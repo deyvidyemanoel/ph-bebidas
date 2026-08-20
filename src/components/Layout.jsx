@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 const PAGE_TITLES = [
   { match: (p) => p === '/' || p.startsWith('/pdv'), label: 'PDV' },
   { match: (p) => p.startsWith('/comandas'), label: 'Comanda' },
+  { match: (p) => p.startsWith('/caixa'), label: 'Caixa' },
   { match: (p) => p.startsWith('/estoque'), label: 'Estoque' },
   { match: (p) => p.startsWith('/clientes'), label: 'Clientes' },
   { match: (p) => p.startsWith('/relatorios'), label: 'Relatórios' },

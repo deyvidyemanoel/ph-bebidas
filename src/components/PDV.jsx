@@ -421,7 +421,7 @@ function PaymentModal({ total, clients, onConfirm, onClose, saving }) {
   );
 }
 
-export default function PDV({ products, clients, sales, addSale, decrementForSale, addMovements }) {
+export default function PDV({ products, clients, sales, addSale, decrementForSale, addMovements, caixaAbertoId }) {
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
@@ -504,6 +504,7 @@ export default function PDV({ products, clients, sales, addSale, decrementForSal
         paymentMethod: method, amountPaid, change,
         customerId: clientId,
         status,
+        caixaId: caixaAbertoId,
       });
 
       // Itens avulsos não afetam estoque nem movimentações

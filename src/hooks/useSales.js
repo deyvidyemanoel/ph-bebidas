@@ -32,6 +32,9 @@ const saleFromRow = (r) => ({
   change: Number(r.change),
   customerId: r.customer_id,
   status: r.status,
+  settledPaymentMethod: r.settled_payment_method,
+  paidAt: r.paid_at,
+  caixaId: r.caixa_id,
 });
 
 export function useSales() {
@@ -53,7 +56,7 @@ export function useSales() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // sale: { items, total, paymentMethod, amountPaid, change, customerId, status }
+  // sale: { items, total, paymentMethod, amountPaid, change, customerId, status, caixaId }
   const addSale = useCallback(async (sale) => {
     const { data: vendaRow, error: vendaErr } = await supabase
       .from('vendas')
@@ -64,6 +67,7 @@ export function useSales() {
         change: sale.change,
         customer_id: sale.customerId || null,
         status: sale.status,
+        caixa_id: sale.caixaId || null,
       })
       .select()
       .single();
@@ -80,10 +84,16 @@ export function useSales() {
     return saved;
   }, []);
 
-  const markPaid = useCallback(async (saleId) => {
+  const markPaid = useCallback(async (saleId, settledPaymentMethod) => {
     const prevSnapshot = sales;
-    setSales(prev => prev.map(s => (s.id === saleId ? { ...s, status: 'pago' } : s)));
-    const { error: err } = await supabase.from('vendas').update({ status: 'pago' }).eq('id', saleId);
+    const paidAt = new Date().toISOString();
+    setSales(prev => prev.map(s => (s.id === saleId
+      ? { ...s, status: 'pago', settledPaymentMethod, paidAt }
+      : s)));
+    const { error: err } = await supabase
+      .from('vendas')
+      .update({ status: 'pago', settled_payment_method: settledPaymentMethod, paid_at: paidAt })
+      .eq('id', saleId);
     if (err) { setSales(prevSnapshot); throw err; }
   }, [sales]);
 

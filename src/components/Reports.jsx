@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import {
   TrendingUp, DollarSign, ShoppingBag, BarChart2,
-  Award, CreditCard, Calendar, Clock, ChevronDown, ChevronUp, Trash2
+  Award, CreditCard, Calendar, Clock, ChevronDown, ChevronUp, Trash2, Check
 } from 'lucide-react';
 import {
   formatCurrency, formatDateTime, isToday,
   isThisWeek, isThisMonth, getPaymentLabel
 } from '../utils/helpers';
 import { Toast } from './Toast';
+import { MarkPaidModal } from './MarkPaidModal';
 
-function SaleRow({ sale, products, onDeleteRequest }) {
+function SaleRow({ sale, products, onDeleteRequest, onMarkPaidRequest }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = sale.status === 'pendente';
 
@@ -48,6 +49,15 @@ function SaleRow({ sale, products, onDeleteRequest }) {
         </td>
         <td className="px-3 py-3">
           <div className="flex items-center justify-end gap-1.5">
+            {isPending && (
+              <button
+                onClick={e => { e.stopPropagation(); onMarkPaidRequest(sale); }}
+                className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors font-medium border border-emerald-500/30 px-2 py-1 rounded-lg hover:bg-emerald-500/10"
+                title="Marcar como pago"
+              >
+                <Check size={11} /> <span className="hidden sm:inline">Marcar Pago</span>
+              </button>
+            )}
             <button
               onClick={e => { e.stopPropagation(); onDeleteRequest(sale); }}
               className="text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-colors p-1.5 rounded-lg"
@@ -86,10 +96,11 @@ function SaleRow({ sale, products, onDeleteRequest }) {
   );
 }
 
-export default function Reports({ products, sales, deleteSale }) {
+export default function Reports({ products, sales, deleteSale, markPaid }) {
   const [period, setPeriod] = useState('today');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(null);
   const [toast, setToast] = useState(null);
 
   const filterSales = () => {
@@ -133,7 +144,7 @@ export default function Reports({ products, sales, deleteSale }) {
   // Payment breakdown (paid only)
   const payMap = {};
   paidSales.forEach(sale => {
-    const k = sale.paymentMethod;
+    const k = sale.settledPaymentMethod || sale.paymentMethod;
     if (!payMap[k]) payMap[k] = { count: 0, total: 0 };
     payMap[k].count++;
     payMap[k].total += sale.total;
@@ -306,7 +317,7 @@ export default function Reports({ products, sales, deleteSale }) {
               </thead>
               <tbody>
                 {sortedSales.map(sale => (
-                  <SaleRow key={sale.id} sale={sale} products={products} onDeleteRequest={setDeleteTarget} />
+                  <SaleRow key={sale.id} sale={sale} products={products} onDeleteRequest={setDeleteTarget} onMarkPaidRequest={setMarkingPaid} />
                 ))}
               </tbody>
               <tfoot>
@@ -373,6 +384,21 @@ export default function Reports({ products, sales, deleteSale }) {
             </div>
           </div>
         </div>
+      )}
+
+      {markingPaid && (
+        <MarkPaidModal
+          sale={markingPaid}
+          onConfirm={async (settledPaymentMethod) => {
+            try {
+              await markPaid(markingPaid.id, settledPaymentMethod);
+              setMarkingPaid(null);
+            } catch (err) {
+              setToast({ type: 'error', message: 'Não foi possível marcar o fiado como pago: ' + err.message });
+            }
+          }}
+          onClose={() => setMarkingPaid(null)}
+        />
       )}
 
       <Toast toast={toast} onClose={() => setToast(null)} />

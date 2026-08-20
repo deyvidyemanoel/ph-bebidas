@@ -343,6 +343,7 @@ export default function Comanda({
   clearItems: clearItemsApi,
   deleteComanda: deleteComandaApi,
   addSale, decrementForSale, addMovements,
+  caixaAbertoId,
 }) {
   // O id da comanda aberta vem da URL (/comandas/:id), não de estado local,
   // assim a comanda selecionada é compartilhável/persiste no F5.
@@ -459,6 +460,7 @@ export default function Comanda({
         change,
         customerId: null,
         status: 'pago',
+        caixaId: caixaAbertoId,
       });
 
       const stockItems = selected.items.filter(i => !i.isAvulso);

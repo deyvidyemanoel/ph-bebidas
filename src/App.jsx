@@ -7,6 +7,7 @@ import PDV from './components/PDV';
 import Reports from './components/Reports';
 import Clients from './components/Clients';
 import Comanda from './components/Comanda';
+import Caixa from './components/Caixa';
 import Settings from './components/Settings';
 import Employees from './components/Employees';
 import Login from './components/Login';
@@ -16,6 +17,7 @@ import { useClients } from './hooks/useClients';
 import { useMovements } from './hooks/useMovements';
 import { useSales } from './hooks/useSales';
 import { useComandas } from './hooks/useComandas';
+import { useCaixa } from './hooks/useCaixa';
 
 function LoadingScreen() {
   return (
@@ -64,9 +66,10 @@ function AuthenticatedApp({ employee }) {
   const movementsApi = useMovements();
   const salesApi = useSales();
   const comandasApi = useComandas();
+  const caixaApi = useCaixa();
 
-  const loading = productsApi.loading || clientsApi.loading || movementsApi.loading || salesApi.loading || comandasApi.loading;
-  const firstError = productsApi.error || clientsApi.error || movementsApi.error || salesApi.error || comandasApi.error;
+  const loading = productsApi.loading || clientsApi.loading || movementsApi.loading || salesApi.loading || comandasApi.loading || caixaApi.loading;
+  const firstError = productsApi.error || clientsApi.error || movementsApi.error || salesApi.error || comandasApi.error || caixaApi.error;
 
   if (loading) return <LoadingScreen />;
   if (firstError) {
@@ -79,6 +82,7 @@ function AuthenticatedApp({ employee }) {
           movementsApi.refetch();
           salesApi.refetch();
           comandasApi.refetch();
+          caixaApi.refetch();
         }}
       />
     );
@@ -108,12 +112,15 @@ function AuthenticatedApp({ employee }) {
 
   // Elementos reutilizados entre rotas equivalentes (ex: "/" e "/pdv"),
   // já que apenas uma rota fica montada por vez.
+  const caixaAbertoId = caixaApi.caixaAberto?.id ?? null;
+
   const pdvElement = (
     <PDV
       products={products} clients={clients} sales={sales}
       addSale={salesApi.addSale}
       decrementForSale={productsApi.decrementForSale}
       addMovements={movementsApi.addMovements}
+      caixaAbertoId={caixaAbertoId}
     />
   );
 
@@ -130,6 +137,7 @@ function AuthenticatedApp({ employee }) {
       addSale={salesApi.addSale}
       decrementForSale={productsApi.decrementForSale}
       addMovements={movementsApi.addMovements}
+      caixaAbertoId={caixaAbertoId}
     />
   );
 
@@ -165,13 +173,28 @@ function AuthenticatedApp({ employee }) {
         <Route path="/comandas" element={comandaElement} />
         <Route path="/comandas/:id" element={comandaElement} />
 
+        <Route
+          path="/caixa"
+          element={
+            <Caixa
+              caixaAberto={caixaApi.caixaAberto}
+              historico={caixaApi.historico}
+              abrirCaixa={caixaApi.abrirCaixa}
+              fecharCaixa={caixaApi.fecharCaixa}
+              deleteCaixa={caixaApi.deleteCaixa}
+              employee={employee}
+              sales={sales}
+            />
+          }
+        />
+
         <Route path="/estoque" element={stockElement} />
         <Route path="/estoque/novo" element={stockElement} />
 
         <Route path="/clientes" element={clientsElement} />
         <Route path="/clientes/:id" element={clientsElement} />
 
-        <Route path="/relatorios" element={<Reports products={products} sales={sales} deleteSale={salesApi.deleteSale} />} />
+        <Route path="/relatorios" element={<Reports products={products} sales={sales} deleteSale={salesApi.deleteSale} markPaid={salesApi.markPaid} />} />
 
         <Route
           path="/configuracoes"

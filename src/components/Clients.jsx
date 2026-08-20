@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime } from '../utils/helpers';
 import { Toast } from './Toast';
+import { MarkPaidModal } from './MarkPaidModal';
 
 function ClientModal({ client, onSave, onClose }) {
   const [form, setForm] = useState(client || { name: '', phone: '', email: '' });
@@ -58,45 +59,6 @@ function ClientModal({ client, onSave, onClose }) {
   );
 }
 
-function MarkPaidModal({ sale, onConfirm, onClose }) {
-  const [saving, setSaving] = useState(false);
-
-  const handleConfirm = async () => {
-    setSaving(true);
-    try {
-      await onConfirm();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
-      <div className="bg-dark-700 border border-dark-400 rounded-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-400">
-          <h3 className="text-white font-bold">Marcar como Pago</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="bg-dark-600 rounded-xl p-4">
-            <p className="text-gray-400 text-xs mb-1">Valor do fiado</p>
-            <p className="text-orange-400 text-3xl font-black">{formatCurrency(sale.total)}</p>
-            <p className="text-gray-500 text-xs mt-1">{formatDateTime(sale.date)}</p>
-            <p className="text-gray-500 text-xs">{sale.items.length} item(s): {sale.items.map(i => i.name).join(', ')}</p>
-          </div>
-          <p className="text-gray-400 text-sm">Confirmar que este fiado foi quitado?</p>
-          <div className="flex gap-3">
-            <button onClick={onClose} disabled={saving} className="flex-1 py-2.5 bg-dark-500 text-gray-400 rounded-xl hover:text-white transition-colors disabled:opacity-50">Cancelar</button>
-            <button onClick={handleConfirm} disabled={saving} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-              <Check size={16} /> {saving ? 'Confirmando...' : 'Marcar Pago'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ClientProfile({ client, sales, markPaid, onBack, onError }) {
   const [markingPaid, setMarkingPaid] = useState(null);
 
@@ -111,9 +73,9 @@ function ClientProfile({ client, sales, markPaid, onBack, onError }) {
   const totalSpent = paidSales.reduce((sum, s) => sum + s.total, 0);
   const avgTicket = paidSales.length > 0 ? totalSpent / paidSales.length : 0;
 
-  const handleMarkPaid = async (saleId) => {
+  const handleMarkPaid = async (saleId, settledPaymentMethod) => {
     try {
-      await markPaid(saleId);
+      await markPaid(saleId, settledPaymentMethod);
       setMarkingPaid(null);
     } catch (err) {
       onError('Não foi possível marcar o fiado como pago: ' + err.message);
@@ -218,7 +180,7 @@ function ClientProfile({ client, sales, markPaid, onBack, onError }) {
       {markingPaid && (
         <MarkPaidModal
           sale={markingPaid}
-          onConfirm={() => handleMarkPaid(markingPaid.id)}
+          onConfirm={(settledPaymentMethod) => handleMarkPaid(markingPaid.id, settledPaymentMethod)}
           onClose={() => setMarkingPaid(null)}
         />
       )}
